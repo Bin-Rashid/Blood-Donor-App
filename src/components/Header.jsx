@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Heart, User, LogIn, UserPlus, Shield, LogOut, Edit, Users } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import AuthModal from './AuthModal'
@@ -10,14 +9,12 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showAdminModal, setShowAdminModal] = useState(false)
   const { isAdmin, signOut } = useAuth()
-  const navigate = useNavigate()
 
   const handleSignOut = async () => {
     try {
       await signOut()
       setShowDropdown(false)
       setActiveTab('register')
-      navigate('/')
     } catch (error) {
       console.error('Error signing out:', error)
     }
@@ -26,37 +23,14 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
   const handleEditProfile = () => {
     setShowDropdown(false)
     setActiveTab('profile')
-    navigate('/profile')
   }
 
   const handleTabClick = (tab) => {
     setActiveTab(tab)
-    
     // If user is not logged in and tries to access profile, show auth modal
     if (tab === 'profile' && !user) {
       setShowAuthModal(true)
-      return
     }
-    
-    // Navigate to corresponding routes
-    if (tab === 'register') {
-      navigate('/')
-    } else if (tab === 'donors') {
-      navigate('/donors')
-    } else if (tab === 'profile') {
-      navigate('/profile')
-    }
-  }
-
-  const handleHomeClick = () => {
-    setActiveTab('register')
-    navigate('/')
-  }
-
-  const handleAuthSuccess = () => {
-    setShowAuthModal(false)
-    setActiveTab('profile')
-    navigate('/profile')
   }
 
   return (
@@ -71,10 +45,7 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
       <div className="relative z-10">
         {/* Top Bar */}
         <div className="px-6 py-4 flex justify-between items-center">
-          <div 
-            className="flex items-center gap-3 cursor-pointer"
-            onClick={handleHomeClick}
-          >
+          <div className="flex items-center gap-3">
             <Heart className="w-8 h-8" fill="white" />
             <h1 className="text-2xl font-bold">LifeShare</h1>
           </div>
@@ -202,7 +173,7 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
           {!user ? (
             <>
               <button
-                onClick={() => handleTabClick('register')}
+                onClick={() => setActiveTab('register')}
                 className={`flex-1 py-4 text-center font-semibold flex items-center justify-center gap-2 transition-all ${
                   activeTab === 'register'
                     ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
@@ -213,7 +184,7 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
                 Register as Donor
               </button>
               <button
-                onClick={() => handleTabClick('donors')}
+                onClick={() => setActiveTab('donors')}
                 className={`flex-1 py-4 text-center font-semibold flex items-center justify-center gap-2 transition-all ${
                   activeTab === 'donors'
                     ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
@@ -241,7 +212,7 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
                 My Profile
               </button>
               <button
-                onClick={() => handleTabClick('donors')}
+                onClick={() => setActiveTab('donors')}
                 className={`flex-1 py-4 text-center font-semibold flex items-center justify-center gap-2 transition-all ${
                   activeTab === 'donors'
                     ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
@@ -263,7 +234,6 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
       <AuthModal 
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        onAuthSuccess={handleAuthSuccess}
       />
 
       {/* Admin Login Modal */}
