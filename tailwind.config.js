@@ -6,6 +6,10 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        'bengali': ['Hind Siliguri', 'sans-serif'],
+        'inter': ['Inter', 'sans-serif'],
+      },
       colors: {
         primary: {
           50: '#fef2f2',

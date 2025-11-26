@@ -56,7 +56,7 @@ const DonorCard = ({
         </div>
       </div>
 
-      <div className={`mb-4 text-center ${
+      <div className={`mb-4 text-center bangla ${
         eligibility.eligible ? 'status-eligible' : 'status-not-eligible'
       }`}>
         {eligibility.message}

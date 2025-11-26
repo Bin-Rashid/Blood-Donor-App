@@ -28,17 +28,17 @@ const Footer = ({ whatsappNumber, onEditWhatsApp, instructions }) => {
         {/* Instructions Section */}
         <div className="px-6 py-8 text-center border-b border-white/20">
           <div className="max-w-4xl mx-auto">
-            <h3 className="text-2xl font-bold mb-4 flex items-center justify-center gap-3">
+            <h3 className="text-2xl font-bold mb-4 flex items-center justify-center gap-3 bangla">
               <Heart className="w-6 h-6" fill="white" />
               {instructions || 'Find Blood Donors Connect with available donors in your area'}
             </h3>
             
             {/* Guidelines Section */}
             <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-6 text-left">
-              <h4 className="text-lg font-semibold mb-4 text-center">📋 Important Guidelines</h4>
-              <div className="grid md:grid-cols-2 gap-4 text-sm">
+              <h4 className="text-lg font-semibold mb-4 text-center bangla">📋 Important Guidelines</h4>
+              <div className="grid md:grid-cols-2 gap-4 text-sm bangla">
                 <div>
-                  <h5 className="font-semibold mb-2 text-red-200">🚫 Important Notice</h5>
+                  <h5 className="font-semibold mb-2 text-red-200 ">🚫 Important Notice</h5>
                   <p>Do not contact donors who are <strong>"Not Eligible"</strong>. They cannot donate blood until their waiting period is over.</p>
                 </div>
                 <div>
@@ -49,7 +49,7 @@ const Footer = ({ whatsappNumber, onEditWhatsApp, instructions }) => {
             </div>
 
             {/* Religious Significance */}
-            <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-6">
+            <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-6 bangla">
               <h4 className="text-lg font-semibold mb-3 text-center">🕌 Virtue of Saving Lives</h4>
               <div className="text-sm space-y-2">
                 <p className="italic">"Whoever saves a life, it will be as if they saved all of humanity." (Quran 5:32)</p>
@@ -67,7 +67,7 @@ const Footer = ({ whatsappNumber, onEditWhatsApp, instructions }) => {
               <span className="text-xl font-bold">LifeShare</span>
             </div>
 
-            <div className="text-center">
+            <div className="text-center bangla">
               <p className="text-lg font-semibold mb-1">সাদাকাহ ফান্ড দ্বারা পরিচালিত একটি কার্যক্রম</p>
               <p className="opacity-90">A initiative powered by Sadaqah Fund</p>
             </div>

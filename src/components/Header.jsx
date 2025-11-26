@@ -145,7 +145,7 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
 
         {/* Hero Section */}
         <div className="px-6 pb-8 text-center relative">
-          <p className="text-xl opacity-90 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-xl opacity-90 max-w-2xl mx-auto leading-relaxed bangla">
             {heroText}
           </p>
           {isAdmin && (
