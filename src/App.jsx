@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Header from './components/Header'
 import Footer from './components/Footer'
 import Register from './pages/Register'
 import Donors from './pages/Donors'
-import Profile from './pages/Profile'
 import AdminModal from './components/AdminModal'
 import { supabase } from './services/supabase'
 import './index.css'
@@ -29,11 +27,11 @@ function AppContent() {
   const [showAdminModal, setShowAdminModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [donors, setDonors] = useState([])
-  const { user, isAdmin } = useAuth()
+  const { isAdmin } = useAuth()
 
   useEffect(() => {
     fetchHeroSettings()
-    fetchDonors()
+    fetchDonors() 
   }, [])
 
   const fetchHeroSettings = async () => {
@@ -57,6 +55,7 @@ function AppContent() {
     }
   }
 
+  // Donors fetch function যোগ করুন
   const fetchDonors = async () => {
     try {
       const { data, error } = await supabase
@@ -94,13 +93,6 @@ function AppContent() {
     }
   }
 
-  // If user is logged in, show profile tab instead of register
-  useEffect(() => {
-    if (user) {
-      setActiveTab('profile')
-    }
-  }, [user])
-
   if (loading) {
     return <LoadingSpinner />
   }
@@ -114,15 +106,11 @@ function AppContent() {
           heroText={heroSettings.text}
           onEditHero={handleEditHero}
           donorsCount={donors.length}
-          user={user}
         />
         
         <main className="flex-1">
-          <Routes>
-            <Route path="/" element={<Register />} />
-            <Route path="/donors" element={<Donors />} />
-            <Route path="/profile" element={<Profile />} />
-          </Routes>
+          {activeTab === 'register' && <Register />}
+          {activeTab === 'donors' && <Donors />}
         </main>
 
         <Footer 
@@ -146,11 +134,9 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </Router>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   )
 }
 

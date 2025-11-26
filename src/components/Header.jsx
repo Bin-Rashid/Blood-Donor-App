@@ -1,64 +1,27 @@
 import React, { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
 import { Heart, User, LogIn, UserPlus, Shield, LogOut, Edit, Users } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import AuthModal from './AuthModal'
 import AdminLoginModal from './AdminLoginModal'
 
-const Header = ({ heroText, onEditHero, donorsCount = 0, user }) => {
+const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0 }) => {
   const [showDropdown, setShowDropdown] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showAdminModal, setShowAdminModal] = useState(false)
-  const { isAdmin, signOut } = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
-
-  // Determine active tab based on current route
-  const getActiveTab = () => {
-    if (location.pathname === '/') return 'register'
-    if (location.pathname === '/donors') return 'donors'
-    if (location.pathname === '/profile') return 'profile'
-    return 'register'
-  }
-
-  const activeTab = getActiveTab()
+  const { user, isAdmin, signOut } = useAuth()
 
   const handleSignOut = async () => {
     try {
       await signOut()
       setShowDropdown(false)
-      navigate('/')
     } catch (error) {
       console.error('Error signing out:', error)
     }
   }
 
-  const handleTabClick = (tab) => {
+  const handleEditProfile = () => {
     setShowDropdown(false)
-    
-    // If user is not logged in and tries to access profile, show auth modal
-    if (tab === 'profile' && !user) {
-      setShowAuthModal(true)
-      return
-    }
-    
-    // Navigate to corresponding routes
-    if (tab === 'register') {
-      navigate('/')
-    } else if (tab === 'donors') {
-      navigate('/donors')
-    } else if (tab === 'profile') {
-      navigate('/profile')
-    }
-  }
-
-  const handleHomeClick = () => {
-    navigate('/')
-  }
-
-  const handleAuthSuccess = () => {
-    setShowAuthModal(false)
-    navigate('/profile')
+    alert('Edit profile feature coming soon...')
   }
 
   return (
@@ -73,10 +36,7 @@ const Header = ({ heroText, onEditHero, donorsCount = 0, user }) => {
       <div className="relative z-10">
         {/* Top Bar */}
         <div className="px-6 py-4 flex justify-between items-center">
-          <div 
-            className="flex items-center gap-3 cursor-pointer"
-            onClick={handleHomeClick}
-          >
+          <div className="flex items-center gap-3">
             <Heart className="w-8 h-8" fill="white" />
             <h1 className="text-2xl font-bold">LifeShare</h1>
           </div>
@@ -84,13 +44,13 @@ const Header = ({ heroText, onEditHero, donorsCount = 0, user }) => {
           <div className="flex items-center gap-4">
             {/* Admin Login Button - Show only when no user is logged in */}
             {!user && (
-              <button
+                <button
                 onClick={() => setShowAdminModal(true)}
                 className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full backdrop-blur-sm hover:bg-white/30 transition-all"
-              >
+                >
                 <Shield className="w-4 h-4" />
                 <span className="font-medium">Admin Login</span>
-              </button>
+                </button>
             )}
 
             <div className="relative">
@@ -148,11 +108,11 @@ const Header = ({ heroText, onEditHero, donorsCount = 0, user }) => {
                       </div>
                       
                       <button 
-                        onClick={() => handleTabClick('profile')}
+                        onClick={handleEditProfile}
                         className="w-full text-left px-4 py-3 hover:bg-gray-100 flex items-center gap-3 text-gray-700"
                       >
                         <Edit className="w-4 h-4" />
-                        My Profile
+                        Edit Profile
                       </button>
 
                       {isAdmin && (
@@ -185,7 +145,7 @@ const Header = ({ heroText, onEditHero, donorsCount = 0, user }) => {
 
         {/* Hero Section */}
         <div className="px-6 pb-8 text-center relative">
-          <p className="text-xl opacity-90 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-xl opacity-90 max-w-2xl mx-auto leading-relaxed bangla">
             {heroText}
           </p>
           {isAdmin && (
@@ -201,71 +161,38 @@ const Header = ({ heroText, onEditHero, donorsCount = 0, user }) => {
 
         {/* Tabs */}
         <div className="flex bg-white">
-          {!user ? (
-            <>
-              <button
-                onClick={() => handleTabClick('register')}
-                className={`flex-1 py-4 text-center font-semibold flex items-center justify-center gap-2 transition-all ${
-                  activeTab === 'register'
-                    ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
-                    : 'text-gray-600 hover:text-red-600'
-                }`}
-              >
-                <UserPlus className="w-5 h-5" />
-                Register as Donor
-              </button>
-              <button
-                onClick={() => handleTabClick('donors')}
-                className={`flex-1 py-4 text-center font-semibold flex items-center justify-center gap-2 transition-all ${
-                  activeTab === 'donors'
-                    ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
-                    : 'text-gray-600 hover:text-red-600'
-                }`}
-              >
-                <Users className="w-5 h-5" />
-                Find Donors
-                <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">
-                  {donorsCount}
-                </span>
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => handleTabClick('profile')}
-                className={`flex-1 py-4 text-center font-semibold flex items-center justify-center gap-2 transition-all ${
-                  activeTab === 'profile'
-                    ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
-                    : 'text-gray-600 hover:text-red-600'
-                }`}
-              >
-                <User className="w-5 h-5" />
-                My Profile
-              </button>
-              <button
-                onClick={() => handleTabClick('donors')}
-                className={`flex-1 py-4 text-center font-semibold flex items-center justify-center gap-2 transition-all ${
-                  activeTab === 'donors'
-                    ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
-                    : 'text-gray-600 hover:text-red-600'
-                }`}
-              >
-                <Users className="w-5 h-5" />
-                Find Donors
-                <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">
-                  {donorsCount}
-                </span>
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+          <button
+            onClick={() => setActiveTab('register')}
+            className={`flex-1 py-4 text-center font-semibold flex items-center justify-center gap-2 transition-all ${
+              activeTab === 'register'
+                ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
+                : 'text-gray-600 hover:text-red-600'
+            }`}
+          >
+            <UserPlus className="w-5 h-5" />
+            Register as Donor
+          </button>
+          <button
+            onClick={() => setActiveTab('donors')}
+            className={`flex-1 py-4 text-center font-semibold flex items-center justify-center gap-2 transition-all ${
+                activeTab === 'donors'
+                ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
+                : 'text-gray-600 hover:text-red-600'
+            }`}
+            >
+            <Users className="w-5 h-5" />
+            Find Donors
+            <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">
+                {donorsCount || 1}
+            </span>
+            </button>
+            </div>
+            </div>
 
       {/* Auth Modal */}
       <AuthModal 
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        onAuthSuccess={handleAuthSuccess}
       />
 
       {/* Admin Login Modal */}
