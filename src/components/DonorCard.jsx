@@ -1,13 +1,17 @@
 import React from 'react'
-import { MapPin, Phone, Calendar, Edit, Trash2 } from 'lucide-react'
+import { MapPin, Phone, Calendar, Edit, Trash2, RefreshCw } from 'lucide-react'
 import { calculateEligibility, formatPhoneNumber } from '../utils/helpers'
-import { useAuth } from '../context/AuthContext'
 
-const DonorCard = ({ donor, onEdit, onDelete, isAdmin = false }) => {
-  const { user } = useAuth()
+const DonorCard = ({ 
+  donor, 
+  onEdit, 
+  onDelete, 
+  isAdmin = false, 
+  currentUserId,
+  deleteLoading = false 
+}) => {
   const eligibility = calculateEligibility(donor.last_donation_date)
-
-  const isOwnProfile = user && user.id === donor.id
+  const isOwnProfile = currentUserId === donor.id
 
   return (
     <div className="donor-card group">
@@ -67,15 +71,18 @@ const DonorCard = ({ donor, onEdit, onDelete, isAdmin = false }) => {
             <Edit className="w-4 h-4" />
             Edit
           </button>
-          {(isOwnProfile || isAdmin) && (
-            <button
-              onClick={() => onDelete(donor)}
-              className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-red-700 transition-all flex items-center justify-center gap-2"
-            >
+          <button
+            onClick={() => onDelete(donor)}
+            disabled={deleteLoading}
+            className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {deleteLoading ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
               <Trash2 className="w-4 h-4" />
-              Delete
-            </button>
-          )}
+            )}
+            {deleteLoading ? 'Deleting...' : 'Delete'}
+          </button>
         </div>
       )}
     </div>

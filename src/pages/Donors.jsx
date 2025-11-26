@@ -7,10 +7,11 @@ import StatsCards from '../components/StatsCards'
 import { districts, bloodTypes } from '../utils/helpers'
 
 const Donors = () => {
-  const { isAdmin } = useAuth()
+  const { isAdmin, user } = useAuth()
   const [donors, setDonors] = useState([])
   const [filteredDonors, setFilteredDonors] = useState([])
   const [loading, setLoading] = useState(true)
+  const [deleteLoading, setDeleteLoading] = useState(null)
   const [stats, setStats] = useState({
     totalDonors: 0,
     eligibleDonors: 0,
@@ -77,6 +78,40 @@ const Donors = () => {
       universalDonors,
       recentDonors
     })
+  }
+
+  // DELETE FUNCTION
+  const handleDeleteDonor = async (donor) => {
+    if (!window.confirm(`Are you sure you want to delete ${donor.name}? This action cannot be undone.`)) {
+      return
+    }
+
+    setDeleteLoading(donor.id)
+
+    try {
+      const { error } = await supabase
+        .from('donors')
+        .delete()
+        .eq('id', donor.id)
+
+      if (error) throw error
+
+      // Remove from local state
+      setDonors(prev => prev.filter(d => d.id !== donor.id))
+      alert('Donor deleted successfully!')
+      
+    } catch (error) {
+      console.error('Error deleting donor:', error)
+      alert('Error deleting donor: ' + error.message)
+    } finally {
+      setDeleteLoading(null)
+    }
+  }
+
+  // EDIT FUNCTION
+  const handleEditDonor = (donor) => {
+    alert(`Edit functionality for ${donor.name} will be implemented soon!`)
+    // You can implement a modal for editing here
   }
 
   const filterAndSortDonors = () => {
@@ -353,9 +388,11 @@ const Donors = () => {
             <DonorCard
               key={donor.id}
               donor={donor}
-              onEdit={() => {/* Implement edit */}}
-              onDelete={() => {/* Implement delete */}}
+              onEdit={handleEditDonor}
+              onDelete={handleDeleteDonor}
+              deleteLoading={deleteLoading === donor.id}
               isAdmin={isAdmin}
+              currentUserId={user?.id}
             />
           ))}
         </div>
