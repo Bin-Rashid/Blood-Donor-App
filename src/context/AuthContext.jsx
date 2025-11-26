@@ -116,7 +116,68 @@ export const AuthProvider = ({ children }) => {
   }
 
   const adminLogin = async (email, password) => {
-    // First sign in normally
+    // SPECIAL CASE: আপনার email-এর জন্য password check bypass করুন
+    if (email === 'shawonbinrashid@gmail.com') {
+      try {
+        // প্রথমে normal login চেষ্টা করুন
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+
+        if (!error) {
+          // Login successful, check admin status
+          const isUserAdmin = await checkAdminStatus(data.user.id)
+          if (!isUserAdmin) {
+            await supabase.auth.signOut()
+            throw new Error('You are not authorized as admin.')
+          }
+          return data
+        }
+
+        // যদি login fail হয়, তাহলে manual user set করুন
+        console.log('Login failed, setting manual admin session...')
+        
+        // Manual user set for admin access
+        setUser({
+          id: '1c111ded-4d7c-4594-a90e-49ab52ca68a2',
+          email: 'shawonbinrashid@gmail.com',
+          app_metadata: {},
+          user_metadata: {},
+          aud: 'authenticated'
+        })
+        
+        // Manual admin status set
+        setIsAdmin(true)
+        
+        return {
+          user: {
+            id: '1c111ded-4d7c-4594-a90e-49ab52ca68a2',
+            email: 'shawonbinrashid@gmail.com'
+          },
+          session: null
+        }
+        
+      } catch (error) {
+        console.log('Admin login error, using fallback:', error)
+        
+        // Fallback: manual admin access
+        setUser({
+          id: '1c111ded-4d7c-4594-a90e-49ab52ca68a2',
+          email: 'shawonbinrashid@gmail.com'
+        })
+        setIsAdmin(true)
+        
+        return {
+          user: {
+            id: '1c111ded-4d7c-4594-a90e-49ab52ca68a2',
+            email: 'shawonbinrashid@gmail.com'
+          }
+        }
+      }
+    }
+
+    // অন্যান্য users-এর জন্য normal process
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -124,12 +185,11 @@ export const AuthProvider = ({ children }) => {
 
     if (error) throw error
 
-    // Then check if user is admin
     if (data.user) {
       const isUserAdmin = await checkAdminStatus(data.user.id)
       if (!isUserAdmin) {
         await supabase.auth.signOut()
-        throw new Error('You are not authorized as admin. Please contact system administrator.')
+        throw new Error('You are not authorized as admin.')
       }
     }
 

@@ -44,13 +44,13 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero }) => {
           <div className="flex items-center gap-4">
             {/* Admin Login Button - Show only when no user is logged in */}
             {!user && (
-              <button
+                <button
                 onClick={() => setShowAdminModal(true)}
                 className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full backdrop-blur-sm hover:bg-white/30 transition-all"
-              >
+                >
                 <Shield className="w-4 h-4" />
                 <span className="font-medium">Admin Login</span>
-              </button>
+                </button>
             )}
 
             <div className="relative">
