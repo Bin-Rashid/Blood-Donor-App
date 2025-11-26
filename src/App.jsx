@@ -4,6 +4,7 @@ import Header from './components/Header'
 import Footer from './components/Footer'
 import Register from './pages/Register'
 import Donors from './pages/Donors'
+import Profile from './pages/Profile'
 import AdminModal from './components/AdminModal'
 import { supabase } from './services/supabase'
 import './index.css'
@@ -27,11 +28,11 @@ function AppContent() {
   const [showAdminModal, setShowAdminModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [donors, setDonors] = useState([])
-  const { isAdmin } = useAuth()
+  const { user, isAdmin } = useAuth()
 
   useEffect(() => {
     fetchHeroSettings()
-    fetchDonors() 
+    fetchDonors()
   }, [])
 
   const fetchHeroSettings = async () => {
@@ -55,7 +56,6 @@ function AppContent() {
     }
   }
 
-  // Donors fetch function যোগ করুন
   const fetchDonors = async () => {
     try {
       const { data, error } = await supabase
@@ -93,6 +93,13 @@ function AppContent() {
     }
   }
 
+  // If user is logged in, show profile tab instead of register
+  useEffect(() => {
+    if (user) {
+      setActiveTab('profile')
+    }
+  }, [user])
+
   if (loading) {
     return <LoadingSpinner />
   }
@@ -106,11 +113,13 @@ function AppContent() {
           heroText={heroSettings.text}
           onEditHero={handleEditHero}
           donorsCount={donors.length}
+          user={user}
         />
         
         <main className="flex-1">
           {activeTab === 'register' && <Register />}
           {activeTab === 'donors' && <Donors />}
+          {activeTab === 'profile' && <Profile />}
         </main>
 
         <Footer 
