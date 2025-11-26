@@ -4,6 +4,7 @@ import { supabase } from '../services/supabase'
 import { useAuth } from '../context/AuthContext'
 import DonorCard from '../components/DonorCard'
 import StatsCards from '../components/StatsCards'
+import EditModal from '../components/EditModal'
 import { districts, bloodTypes } from '../utils/helpers'
 
 const Donors = () => {
@@ -12,6 +13,8 @@ const Donors = () => {
   const [filteredDonors, setFilteredDonors] = useState([])
   const [loading, setLoading] = useState(true)
   const [deleteLoading, setDeleteLoading] = useState(null)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [selectedDonor, setSelectedDonor] = useState(null)
   const [stats, setStats] = useState({
     totalDonors: 0,
     eligibleDonors: 0,
@@ -110,8 +113,13 @@ const Donors = () => {
 
   // EDIT FUNCTION
   const handleEditDonor = (donor) => {
-    alert(`Edit functionality for ${donor.name} will be implemented soon!`)
-    // You can implement a modal for editing here
+    setSelectedDonor(donor)
+    setEditModalOpen(true)
+  }
+
+  const handleUpdateDonor = () => {
+    // Refresh the donors list after update
+    fetchDonors()
   }
 
   const filterAndSortDonors = () => {
@@ -251,7 +259,7 @@ const Donors = () => {
             </div>
           </div>
           <p className="text-gray-600">
-            You are logged in as an administrator. You can now delete donor records and manage the system.
+            You are logged in as an administrator. You can now edit and delete donor records.
           </p>
         </div>
       )}
@@ -397,6 +405,14 @@ const Donors = () => {
           ))}
         </div>
       )}
+
+      {/* Edit Modal */}
+      <EditModal
+        isOpen={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        donor={selectedDonor}
+        onUpdate={handleUpdateDonor}
+      />
     </div>
   )
 }
