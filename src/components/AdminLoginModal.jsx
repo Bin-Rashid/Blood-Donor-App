@@ -1,98 +1,108 @@
 import React, { useState } from 'react'
-import { X, Shield, Mail, Lock } from 'lucide-react'
+import { X, Shield, AlertCircle } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const AdminLoginModal = ({ isOpen, onClose }) => {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  })
+  const [error, setError] = useState('')
   const { adminLogin } = useAuth()
-
-  if (!isOpen) return null
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
-    
+    setError('')
+
     try {
-      await adminLogin(formData.email, formData.password)
-      alert('Admin login successful!')
+      await adminLogin(email, password)
       onClose()
+      setEmail('')
+      setPassword('')
     } catch (error) {
-      alert(`Admin login failed: ${error.message}`)
+      console.error('Admin login error:', error)
+      setError(error.message || 'Failed to login as admin')
     } finally {
       setLoading(false)
     }
   }
 
+  if (!isOpen) return null
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-            <Shield className="w-5 h-5" />
-            Admin Login
-          </h3>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-md w-full">
+        <div className="flex items-center justify-between p-6 border-b">
+          <div className="flex items-center gap-3">
+            <Shield className="w-6 h-6 text-red-600" />
+            <h2 className="text-xl font-semibold">Admin Login</h2>
+          </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-1 hover:bg-gray-100 rounded-full transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Admin Email
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData(prev => ({...prev, email: e.target.value}))}
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 text-black focus:ring-2 focus:ring-red-200 transition-all"
-                  placeholder="admin@example.com"
-                  required
-                />
-              </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+              <AlertCircle className="w-4 h-4" />
+              <span className="text-sm">{error}</span>
             </div>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData(prev => ({...prev, password: e.target.value}))}
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 text-black focus:ring-2 focus:ring-red-200 transition-all"
-                  placeholder="Admin password"
-                  required
-                />
-              </div>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              placeholder="Enter admin email"
+              required
+            />
+          </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              placeholder="Enter password"
+              required
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              disabled={loading}
+            >
+              Cancel
+            </button>
             <button
               type="submit"
+              className="flex-1 py-2 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={loading}
-              className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              <Shield className="w-4 h-4" />
-              {loading ? 'Signing In...' : 'Login as Admin'}
+              {loading ? 'Logging in...' : 'Login as Admin'}
             </button>
-          </form>
+          </div>
+        </form>
 
-          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">
-              <strong>Note:</strong> Contact system administrator for credentials.
-            </p>
+        <div className="px-6 pb-6">
+          <div className="text-xs text-gray-500 p-3 bg-gray-50 rounded-lg">
+            <strong>Development Note:</strong> If you're Shawon, use your email to access admin features. The system will create a development session for testing.
           </div>
         </div>
       </div>
