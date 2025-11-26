@@ -63,27 +63,28 @@ const DonorCard = ({
       </div>
 
       {(isOwnProfile || isAdmin) && (
-        <div className="flex gap-2 pt-4 border-t border-gray-100">
-          <button
-            onClick={() => onEdit(donor)}
-            className="flex-1 btn-outline py-2 text-sm"
-          >
-            <Edit className="w-4 h-4" />
-            Edit
-          </button>
-          <button
-            onClick={() => onDelete(donor)}
-            disabled={deleteLoading}
-            className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {deleteLoading ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <Trash2 className="w-4 h-4" />
-            )}
-            {deleteLoading ? 'Deleting...' : 'Delete'}
-          </button>
-        </div>
+  <div className="flex gap-2 pt-4 border-t border-gray-100">
+    <button
+      onClick={() => onEdit(donor)}
+      className="flex-1 btn-outline py-2 text-sm"
+    >
+      <Edit className="w-4 h-4" />
+      {isOwnProfile ? 'Edit My Profile' : 'Edit'}
+    </button>
+    
+    <button
+      onClick={() => onDelete(donor)}
+      disabled={deleteLoading}
+      className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+    >
+      {deleteLoading ? (
+        <RefreshCw className="w-4 h-4 animate-spin" />
+      ) : (
+        <Trash2 className="w-4 h-4" />
+      )}
+      {deleteLoading ? 'Deleting...' : (isOwnProfile ? 'Delete My Profile' : 'Delete')}
+    </button>
+  </div>
       )}
     </div>
   )

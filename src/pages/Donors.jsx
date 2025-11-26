@@ -83,36 +83,55 @@ const Donors = () => {
     })
   }
 
-  // DELETE FUNCTION
-  const handleDeleteDonor = async (donor) => {
-    if (!window.confirm(`Are you sure you want to delete ${donor.name}? This action cannot be undone.`)) {
-      return
-    }
+  // DELETE FUNCTION - Properly Implemented  
+        const handleDeleteDonor = (donor) => {
+        // Check if user has permission to delete
+        const canDelete = isAdmin || user?.id === donor.id;
+        
+        if (!canDelete) {
+            alert('You can only delete your own profile');
+            return;
+        }
 
-    setDeleteLoading(donor.id)
+        if (!window.confirm(`Are you sure you want to delete ${donor.name}? This action cannot be undone.`)) {
+            return;
+        }
 
-    try {
-      const { error } = await supabase
-        .from('donors')
-        .delete()
-        .eq('id', donor.id)
+        setDeleteLoading(donor.id);
 
-      if (error) throw error
+        // Actual delete implementation
+        const deleteDonor = async () => {
+            try {
+            const { error } = await supabase
+                .from('donors')
+                .delete()
+                .eq('id', donor.id)
 
-      // Remove from local state
-      setDonors(prev => prev.filter(d => d.id !== donor.id))
-      alert('Donor deleted successfully!')
-      
-    } catch (error) {
-      console.error('Error deleting donor:', error)
-      alert('Error deleting donor: ' + error.message)
-    } finally {
-      setDeleteLoading(null)
-    }
-  }
+            if (error) throw error
+
+            // Remove from local state
+            setDonors(prev => prev.filter(d => d.id !== donor.id))
+            alert('Profile deleted successfully!')
+            
+            } catch (error) {
+            console.error('Error deleting donor:', error)
+            alert('Error deleting profile: ' + error.message)
+            } finally {
+            setDeleteLoading(null)
+            }
+        }
+
+        deleteDonor();
+        }
 
   // EDIT FUNCTION
   const handleEditDonor = (donor) => {
+    const canEdit = isAdmin || user?.id === donor.id;
+
+    if (!canEdit) {
+    alert('You can only edit your own profile');
+    return;
+  }
     setSelectedDonor(donor)
     setEditModalOpen(true)
   }
@@ -396,8 +415,8 @@ const Donors = () => {
             <DonorCard
               key={donor.id}
               donor={donor}
-              onEdit={handleEditDonor}
-              onDelete={handleDeleteDonor}
+              onEdit={() => handleEditDonor(donor)} // এখানে change করুন
+              onDelete={() => handleDeleteDonor(donor)} // এখানে change করুন
               deleteLoading={deleteLoading === donor.id}
               isAdmin={isAdmin}
               currentUserId={user?.id}

@@ -183,11 +183,11 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
             <Users className="w-5 h-5" />
             Find Donors
             <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">
-               {donorsCount}
+                {donorsCount || 1}
             </span>
-          </button>
-        </div>
-      </div>
+            </button>
+            </div>
+            </div>
 
       {/* Auth Modal */}
       <AuthModal 
