@@ -26,10 +26,12 @@ function AppContent() {
   })
   const [showAdminModal, setShowAdminModal] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [donors, setDonors] = useState([])
   const { isAdmin } = useAuth()
 
   useEffect(() => {
     fetchHeroSettings()
+    fetchDonors() 
   }, [])
 
   const fetchHeroSettings = async () => {
@@ -50,6 +52,20 @@ function AppContent() {
       console.error('Error fetching hero settings:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Donors fetch function যোগ করুন
+  const fetchDonors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('donors')
+        .select('*')
+      
+      if (error) throw error
+      setDonors(data || [])
+    } catch (error) {
+      console.error('Error fetching donors:', error)
     }
   }
 
@@ -89,6 +105,7 @@ function AppContent() {
           setActiveTab={setActiveTab}
           heroText={heroSettings.text}
           onEditHero={handleEditHero}
+          donorsCount={donors.length}
         />
         
         <main className="flex-1">

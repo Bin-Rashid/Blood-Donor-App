@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import AuthModal from './AuthModal'
 import AdminLoginModal from './AdminLoginModal'
 
-const Header = ({ activeTab, setActiveTab, heroText, onEditHero }) => {
+const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0 }) => {
   const [showDropdown, setShowDropdown] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showAdminModal, setShowAdminModal] = useState(false)
@@ -175,15 +175,15 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero }) => {
           <button
             onClick={() => setActiveTab('donors')}
             className={`flex-1 py-4 text-center font-semibold flex items-center justify-center gap-2 transition-all ${
-              activeTab === 'donors'
+                activeTab === 'donors'
                 ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
                 : 'text-gray-600 hover:text-red-600'
             }`}
-          >
+            >
             <Users className="w-5 h-5" />
             Find Donors
             <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">
-              0
+               {donorsCount}
             </span>
           </button>
         </div>
