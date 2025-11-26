@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Header from './components/Header'
 import Footer from './components/Footer'
@@ -117,9 +118,11 @@ function AppContent() {
         />
         
         <main className="flex-1">
-          {activeTab === 'register' && <Register />}
-          {activeTab === 'donors' && <Donors />}
-          {activeTab === 'profile' && <Profile />}
+          <Routes>
+            <Route path="/" element={<Register />} />
+            <Route path="/donors" element={<Donors />} />
+            <Route path="/profile" element={<Profile />} />
+          </Routes>
         </main>
 
         <Footer 
@@ -143,9 +146,11 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <Router>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </Router>
   )
 }
 
