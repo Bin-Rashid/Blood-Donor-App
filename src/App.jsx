@@ -96,7 +96,7 @@ function AppContent() {
   if (loading) return <LoadingSpinner />
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL || '/'}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100">
         <div className="max-w-6xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden min-h-screen flex flex-col">
 
