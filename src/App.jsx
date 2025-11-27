@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+
 import Header from './components/Header'
 import Footer from './components/Footer'
 import Register from './pages/Register'
 import Donors from './pages/Donors'
 import AdminModal from './components/AdminModal'
+
 import { supabase } from './services/supabase'
 import './index.css'
 
@@ -27,19 +30,17 @@ function AppContent() {
   const [showAdminModal, setShowAdminModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [donors, setDonors] = useState([])
+
   const { isAdmin } = useAuth()
 
   useEffect(() => {
     fetchHeroSettings()
-    fetchDonors() 
+    fetchDonors()
   }, [])
 
   const fetchHeroSettings = async () => {
     try {
-      const { data, error } = await supabase
-        .from('hero_settings')
-        .select('*')
-        .single()
+      const { data } = await supabase.from('hero_settings').select('*').single()
 
       if (data) {
         setHeroSettings({
@@ -57,10 +58,7 @@ function AppContent() {
 
   const fetchDonors = async () => {
     try {
-      const { data, error } = await supabase
-        .from('donors')
-        .select('*')
-      
+      const { data, error } = await supabase.from('donors').select('*')
       if (error) throw error
       setDonors(data || [])
     } catch (error) {
@@ -79,10 +77,13 @@ function AppContent() {
       const { error } = await supabase
         .from('hero_settings')
         .update(newSettings)
-        .eq('id', (await supabase.from('hero_settings').select('id').single()).data?.id)
+        .eq(
+          'id',
+          (await supabase.from('hero_settings').select('id').single()).data?.id
+        )
 
       if (error) throw error
-      
+
       setHeroSettings(newSettings)
       setShowAdminModal(false)
       alert('Settings updated successfully!')
@@ -92,41 +93,47 @@ function AppContent() {
     }
   }
 
-  if (loading) {
-    return <LoadingSpinner />
-  }
+  if (loading) return <LoadingSpinner />
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100">
-      <div className="max-w-6xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden min-h-screen flex flex-col">
-        <Header 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab}
-          heroText={heroSettings.text}
-          onEditHero={handleEditHero}
-          donorsCount={donors.length}
-        />
-        
-        <main className="flex-1">
-          {activeTab === 'register' && <Register />}
-          {activeTab === 'donors' && <Donors />}
-        </main>
+    <BrowserRouter>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100">
+        <div className="max-w-6xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden min-h-screen flex flex-col">
 
-        <Footer 
-          whatsappNumber={heroSettings.whatsapp_number}
-          instructions={heroSettings.instructions_text}
-        />
-
-        {isAdmin && (
-          <AdminModal
-            isOpen={showAdminModal}
-            onClose={() => setShowAdminModal(false)}
-            settings={heroSettings}
-            onSave={updateHeroSettings}
+          <Header
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            heroText={heroSettings.text}
+            onEditHero={handleEditHero}
+            donorsCount={donors.length}
           />
-        )}
+
+          <main className="flex-1">
+
+            <Routes>
+              <Route path="/" element={<Register />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/donors" element={<Donors />} />
+            </Routes>
+
+          </main>
+
+          <Footer
+            whatsappNumber={heroSettings.whatsapp_number}
+            instructions={heroSettings.instructions_text}
+          />
+
+          {isAdmin && (
+            <AdminModal
+              isOpen={showAdminModal}
+              onClose={() => setShowAdminModal(false)}
+              settings={heroSettings}
+              onSave={updateHeroSettings}
+            />
+          )}
+        </div>
       </div>
-    </div>
+    </BrowserRouter>
   )
 }
 

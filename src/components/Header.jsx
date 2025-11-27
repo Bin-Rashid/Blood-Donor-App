@@ -1,14 +1,20 @@
 import React, { useState } from 'react'
 import { Heart, User, LogIn, UserPlus, Shield, LogOut, Edit, Users } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import AuthModal from './AuthModal'
 import AdminLoginModal from './AdminLoginModal'
 
-const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0 }) => {
+const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
   const [showDropdown, setShowDropdown] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showAdminModal, setShowAdminModal] = useState(false)
+
   const { user, isAdmin, signOut } = useAuth()
+  const location = useLocation()
+
+  // Active tab detection based on URL
+  const activeTab = location.pathname === '/donors' ? 'donors' : 'register'
 
   const handleSignOut = async () => {
     try {
@@ -42,15 +48,15 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Admin Login Button - Show only when no user is logged in */}
+
             {!user && (
-                <button
+              <button
                 onClick={() => setShowAdminModal(true)}
                 className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full backdrop-blur-sm hover:bg-white/30 transition-all"
-                >
+              >
                 <Shield className="w-4 h-4" />
                 <span className="font-medium">Admin Login</span>
-                </button>
+              </button>
             )}
 
             <div className="relative">
@@ -70,7 +76,7 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
                 <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-lg shadow-lg py-2 z-50 border border-gray-200">
                   {!user ? (
                     <>
-                      <button 
+                      <button
                         onClick={() => {
                           setShowAuthModal(true)
                           setShowDropdown(false)
@@ -83,7 +89,8 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
                           <div className="text-sm text-gray-500">Access your account</div>
                         </div>
                       </button>
-                      <button 
+
+                      <button
                         onClick={() => {
                           setShowAuthModal(true)
                           setShowDropdown(false)
@@ -106,8 +113,8 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
                           {isAdmin ? 'Administrator' : 'Blood Donor'}
                         </div>
                       </div>
-                      
-                      <button 
+
+                      <button
                         onClick={handleEditProfile}
                         className="w-full text-left px-4 py-3 hover:bg-gray-100 flex items-center gap-3 text-gray-700"
                       >
@@ -116,7 +123,7 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
                       </button>
 
                       {isAdmin && (
-                        <button 
+                        <button
                           onClick={() => {
                             onEditHero()
                             setShowDropdown(false)
@@ -143,7 +150,7 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
           </div>
         </div>
 
-        {/* Hero Section */}
+        {/* Hero */}
         <div className="px-6 pb-8 text-center relative">
           <p className="text-xl opacity-90 max-w-2xl mx-auto leading-relaxed bangla">
             {heroText}
@@ -161,8 +168,9 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
 
         {/* Tabs */}
         <div className="flex bg-white">
-          <button
-            onClick={() => setActiveTab('register')}
+          
+          <Link
+            to="/register"
             className={`flex-1 py-4 text-center font-semibold flex items-center justify-center gap-2 transition-all ${
               activeTab === 'register'
                 ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
@@ -171,26 +179,28 @@ const Header = ({ activeTab, setActiveTab, heroText, onEditHero, donorsCount = 0
           >
             <UserPlus className="w-5 h-5" />
             Register as Donor
-          </button>
-          <button
-            onClick={() => setActiveTab('donors')}
+          </Link>
+
+          <Link
+            to="/donors"
             className={`flex-1 py-4 text-center font-semibold flex items-center justify-center gap-2 transition-all ${
-                activeTab === 'donors'
+              activeTab === 'donors'
                 ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
                 : 'text-gray-600 hover:text-red-600'
             }`}
-            >
+          >
             <Users className="w-5 h-5" />
             Find Donors
             <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">
-                {donorsCount || 1}
+              {donorsCount || 1}
             </span>
-            </button>
-            </div>
-            </div>
+          </Link>
+
+        </div>
+      </div>
 
       {/* Auth Modal */}
-      <AuthModal 
+      <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
       />
