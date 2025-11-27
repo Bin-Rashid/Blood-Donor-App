@@ -5,7 +5,10 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
-    host: '0.0.0.0' // এই লাইনটি পরিবর্তন করুন
+    host: '0.0.0.0',
+    headers: {
+      'Content-Security-Policy': "default-src 'self' 'unsafe-inline' 'unsafe-eval' http: https: ws: wss: data: blob:;"
+    }
   },
   build: {
     outDir: 'dist'
