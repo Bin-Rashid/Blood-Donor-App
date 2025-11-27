@@ -151,7 +151,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                   type="email"
                   value={registerData.email}
                   onChange={(e) => setRegisterData(prev => ({...prev, email: e.target.value}))}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all text-black"
                   placeholder="your@email.com"
                   required
                 />
@@ -165,7 +165,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                   type="password"
                   value={registerData.password}
                   onChange={(e) => setRegisterData(prev => ({...prev, password: e.target.value}))}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all text-black"
                   placeholder="Create a password"
                   required
                   minLength={6}
@@ -182,7 +182,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                     type="tel"
                     value={registerData.phone}
                     onChange={(e) => setRegisterData(prev => ({...prev, phone: e.target.value}))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all text-black"
                     placeholder="01XXX-XXXXXX"
                     required
                   />
@@ -196,7 +196,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                     type="number"
                     value={registerData.age}
                     onChange={(e) => setRegisterData(prev => ({...prev, age: e.target.value}))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all text-black"
                     placeholder="Age"
                     min="18"
                     max="65"
