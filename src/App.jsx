@@ -4,6 +4,7 @@ import Header from './components/Header'
 import Footer from './components/Footer'
 import Register from './pages/Register'
 import Donors from './pages/Donors'
+import Login from './pages/Login' // Login page import করুন
 import AdminModal from './components/AdminModal'
 import { supabase } from './services/supabase'
 import './index.css'
@@ -27,12 +28,22 @@ function AppContent() {
   const [showAdminModal, setShowAdminModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [donors, setDonors] = useState([])
-  const { isAdmin } = useAuth()
+  const { user, isAdmin, loading: authLoading } = useAuth() // authLoading add করুন
+
+  // Auth loading হলে spinner show করবে
+  if (authLoading) {
+    return <LoadingSpinner />
+  }
+
+  // User না থাকলে Login page show করবে
+  if (!user) {
+    return <Login />
+  }
 
   useEffect(() => {
     fetchHeroSettings()
     fetchDonors() 
-  }, [])
+  }, [user]) // user change হলে re-fetch
 
   const fetchHeroSettings = async () => {
     try {
