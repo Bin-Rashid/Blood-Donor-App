@@ -2,7 +2,6 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
-import { BrowserRouter } from 'react-router-dom'
 
 // Error boundary for catching errors
 class ErrorBoundary extends React.Component {
@@ -42,9 +41,7 @@ try {
   root.render(
     <React.StrictMode>
       <ErrorBoundary>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
+        <App />
       </ErrorBoundary>
     </React.StrictMode>
   );

@@ -6,7 +6,6 @@ import Register from './pages/Register'
 import Donors from './pages/Donors'
 import AdminModal from './components/AdminModal'
 import { supabase } from './services/supabase'
-import { Routes, Route } from 'react-router-dom'
 import './index.css'
 
 const LoadingSpinner = () => (
@@ -19,6 +18,7 @@ const LoadingSpinner = () => (
 )
 
 function AppContent() {
+  const [activeTab, setActiveTab] = useState('register')
   const [heroSettings, setHeroSettings] = useState({
     text: 'Connecting blood donors with those in need. Your single donation can save up to three lives.',
     whatsapp_number: '+880XXXXXXXXX',
@@ -36,7 +36,11 @@ function AppContent() {
 
   const fetchHeroSettings = async () => {
     try {
-      const { data } = await supabase.from('hero_settings').select('*').single()
+      const { data, error } = await supabase
+        .from('hero_settings')
+        .select('*')
+        .single()
+
       if (data) {
         setHeroSettings({
           text: data.text,
@@ -53,7 +57,10 @@ function AppContent() {
 
   const fetchDonors = async () => {
     try {
-      const { data, error } = await supabase.from('donors').select('*')
+      const { data, error } = await supabase
+        .from('donors')
+        .select('*')
+      
       if (error) throw error
       setDonors(data || [])
     } catch (error) {
@@ -62,19 +69,20 @@ function AppContent() {
   }
 
   const handleEditHero = () => {
-    if (isAdmin) setShowAdminModal(true)
+    if (isAdmin) {
+      setShowAdminModal(true)
+    }
   }
 
   const updateHeroSettings = async (newSettings) => {
     try {
-      const { data } = await supabase.from('hero_settings').select('id').single()
       const { error } = await supabase
         .from('hero_settings')
         .update(newSettings)
-        .eq('id', data?.id)
+        .eq('id', (await supabase.from('hero_settings').select('id').single()).data?.id)
 
       if (error) throw error
-
+      
       setHeroSettings(newSettings)
       setShowAdminModal(false)
       alert('Settings updated successfully!')
@@ -84,22 +92,24 @@ function AppContent() {
     }
   }
 
-  if (loading) return <LoadingSpinner />
+  if (loading) {
+    return <LoadingSpinner />
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100">
       <div className="max-w-6xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden min-h-screen flex flex-col">
         <Header 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab}
           heroText={heroSettings.text}
           onEditHero={handleEditHero}
           donorsCount={donors.length}
         />
         
         <main className="flex-1">
-          <Routes>
-            <Route path="/" element={<Register />} />
-            <Route path="/donors" element={<Donors />} />
-          </Routes>
+          {activeTab === 'register' && <Register />}
+          {activeTab === 'donors' && <Donors />}
         </main>
 
         <Footer 
