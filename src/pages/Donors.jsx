@@ -1,12 +1,12 @@
 // src/pages/Donors.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, Filter, Download, RefreshCw, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useDonors } from '../context/DonorContext';
 import DonorCard from '../components/DonorCard';
 import StatsCards from '../components/StatsCards';
 import EditModal from '../components/EditModal';
-import { districts, bloodTypes } from '../utils/helpers';
+import { districts, bloodTypes, useDebounce } from '../utils/helpers';
 
 const Donors = () => {
   const { isAdmin, user } = useAuth?.() || { isAdmin: false, user: null }; // defensive
@@ -25,19 +25,12 @@ const Donors = () => {
     sortBy: 'name-asc',
   });
 
-  const prevFiltersRef = useRef();
+  const debouncedFilters = useDebounce(filters, 300);
 
-  // Debounced fetch when filters change
+  // Fetch donors when debounced filters change
   useEffect(() => {
-    const filtersChanged = JSON.stringify(prevFiltersRef.current) !== JSON.stringify(filters);
-    if (filtersChanged) {
-      prevFiltersRef.current = filters;
-      const t = setTimeout(() => {
-        fetchDonors(filters, filters.sortBy);
-      }, 300);
-      return () => clearTimeout(t);
-    }
-  }, [filters, fetchDonors]); // fetchDonors is stable from context
+    fetchDonors(debouncedFilters, debouncedFilters.sortBy);
+  }, [debouncedFilters, fetchDonors]);
 
   const handleDeleteDonor = async (donor) => {
     const canDelete = isAdmin || user?.id === donor.id;

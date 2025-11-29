@@ -8,6 +8,7 @@ export const DonorProvider = ({ children }) => {
   const [donors, setDonors] = useState([]);
   const [loading, setLoading] = useState(true);
   const mountedRef = useRef(true);
+  const lastQueryRef = useRef('');
 
   // Utility: sanitize user input for ilike/or queries
   const sanitize = (str = '') => {
@@ -16,6 +17,14 @@ export const DonorProvider = ({ children }) => {
 
   const fetchDonors = useCallback(async (filters = {}, sortBy = 'name-asc') => {
     if (!mountedRef.current) return;
+
+    // Create a query key to prevent duplicate requests
+    const queryKey = JSON.stringify({ filters, sortBy });
+    if (lastQueryRef.current === queryKey) {
+      return; // Skip if same query
+    }
+    lastQueryRef.current = queryKey;
+
     setLoading(true);
 
     try {
