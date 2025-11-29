@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-import { useDonors } from './context/DonorContext'; // Import useDonors
+import { useDonors } from './context/DonorContext';
 
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -32,7 +32,7 @@ function AppContent() {
   const [loading, setLoading] = useState(true);
 
   const { isAdmin } = useAuth();
-  const { donors, loading: donorsLoading } = useDonors(); // Use donors from context
+  const { donors, loading: donorsLoading } = useDonors();
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -48,26 +48,27 @@ function AppContent() {
     initializeApp();
   }, []);
 
-  const fetchHeroSettings = async () => {
+  const fetchHeroSettings = useCallback(async () => {
     try {
-      const { data, error } = await supabase.from('hero_settings').select('*').single();
+      const { data, error } = await supabase.from('hero_settings').select('*');
 
       if (error) {
-        console.error('Error fetching hero settings:', error);
+        console.error('Error fetching hero settings:', error.message);
         return;
       }
 
-      if (data) {
+      if (data && data.length > 0) {
+        const settings = data[0];
         setHeroSettings({
-          text: data.text || 'Connecting blood donors with those in need. Your single donation can save up to three lives.',
-          whatsapp_number: data.whatsapp_number || '+880XXXXXXXXX',
-          instructions_text: data.instructions_text || 'Find Blood Donors Connect with available donors in your area',
+          text: settings.text || 'Connecting blood donors with those in need. Your single donation can save up to three lives.',
+          whatsapp_number: settings.whatsapp_number || '+880XXXXXXXXX',
+          instructions_text: settings.instructions_text || 'Find Blood Donors Connect with available donors in your area',
         });
       }
     } catch (error) {
       console.error('Error in fetchHeroSettings:', error);
     }
-  };
+  }, []);
 
   const handleEditHero = () => {
     if (isAdmin) {
@@ -77,7 +78,6 @@ function AppContent() {
 
   const updateHeroSettings = async (newSettings) => {
     try {
-      // Get the existing record ID
       const { data: existingData } = await supabase
         .from('hero_settings')
         .select('id')
@@ -86,7 +86,6 @@ function AppContent() {
       let error;
       
       if (existingData?.id) {
-        // Update existing record
         const { error: updateError } = await supabase
           .from('hero_settings')
           .update(newSettings)
@@ -94,7 +93,6 @@ function AppContent() {
 
         error = updateError;
       } else {
-        // Create new record if doesn't exist
         const { error: insertError } = await supabase
           .from('hero_settings')
           .insert([newSettings]);
@@ -154,7 +152,12 @@ function AppContent() {
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
       <AppContent />
     </BrowserRouter>
   );

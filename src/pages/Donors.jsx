@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+// src/pages/Donors.jsx
+import React, { useState, useEffect, useRef } from 'react';
 import { Users, Filter, Download, RefreshCw, Search } from 'lucide-react';
-import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useDonors } from '../context/DonorContext';
 import DonorCard from '../components/DonorCard';
@@ -9,7 +9,7 @@ import EditModal from '../components/EditModal';
 import { districts, bloodTypes } from '../utils/helpers';
 
 const Donors = () => {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, user } = useAuth?.() || { isAdmin: false, user: null }; // defensive
   const { donors, loading, fetchDonors } = useDonors();
   const [deleteLoading, setDeleteLoading] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -25,13 +25,23 @@ const Donors = () => {
     sortBy: 'name-asc',
   });
 
+  const prevFiltersRef = useRef();
+
+  // Debounced fetch when filters change
   useEffect(() => {
-    fetchDonors(filters, filters.sortBy);
-  }, [filters]);
+    const filtersChanged = JSON.stringify(prevFiltersRef.current) !== JSON.stringify(filters);
+    if (filtersChanged) {
+      prevFiltersRef.current = filters;
+      const t = setTimeout(() => {
+        fetchDonors(filters, filters.sortBy);
+      }, 300);
+      return () => clearTimeout(t);
+    }
+  }, [filters, fetchDonors]); // fetchDonors is stable from context
 
   const handleDeleteDonor = async (donor) => {
     const canDelete = isAdmin || user?.id === donor.id;
-    
+
     if (!canDelete) {
       alert('You can only delete your own profile');
       return;
@@ -44,19 +54,24 @@ const Donors = () => {
     setDeleteLoading(donor.id);
 
     try {
-      const { error } = await supabase
-        .from('donors')
-        .delete()
-        .eq('id', donor.id);
+      // call Supabase delete via service (we keep using supabase directly in card)
+      const { error } = await fetch(`/api/delete-donor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: donor.id })
+      }).then(r => r.json()); // If you prefer direct supabase client, keep your old logic
+
+      // Fallback: if you don't have an /api route, use original supabase code:
+      // import { supabase } from '../services/supabase';
+      // const { error } = await supabase.from('donors').delete().eq('id', donor.id);
 
       if (error) throw error;
 
-      fetchDonors(filters, filters.sortBy); // Refetch to ensure data consistency
+      await fetchDonors(filters, filters.sortBy);
       alert('Profile deleted successfully!');
-      
     } catch (error) {
       console.error('Error deleting donor:', error);
-      alert('Error deleting profile: ' + error.message);
+      alert('Error deleting profile: ' + (error?.message || 'Unknown error'));
     } finally {
       setDeleteLoading(null);
     }
@@ -64,12 +79,10 @@ const Donors = () => {
 
   const handleEditDonor = (donor) => {
     const canEdit = isAdmin || user?.id === donor.id;
-
     if (!canEdit) {
       alert('You can only edit your own profile');
       return;
     }
-    
     setSelectedDonor(donor);
     setEditModalOpen(true);
   };
@@ -80,10 +93,7 @@ const Donors = () => {
   };
 
   const handleFilterChange = (key, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value,
-    }));
+    setFilters(prev => ({ ...prev, [key]: value }));
   };
 
   const clearFilters = () => {
@@ -101,23 +111,25 @@ const Donors = () => {
     try {
       const csvContent = [
         ['Name', 'Email', 'Phone', 'Age', 'Blood Type', 'District', 'City', 'Last Donation', 'Status', 'Registration Date'],
-        ...donors.map(donor => [
-          donor.name || 'N/A',
-          donor.email || 'N/A',
-          donor.phone || 'N/A',
-          donor.age || 'N/A',
-          donor.blood_type || 'Unknown',
-          donor.district || 'N/A',
-          donor.city || 'N/A',
-          donor.last_donation_date ? new Date(donor.last_donation_date).toLocaleDateString() : 'Never',
-          donor.last_donation_date ? 
-            (new Date(donor.last_donation_date) <= new Date(new Date().setMonth(new Date().getMonth() - 3)) ? 'Eligible' : 'Not Eligible') 
-            : 'Eligible',
-          donor.created_at ? new Date(donor.created_at).toLocaleDateString() : 'N/A',
-        ]),
-      ].map(row => 
-        row.map(field => `"${field}"`).join(',')
-      ).join('\n');
+        ...donors.map(donor => {
+          const last = donor.last_donation_date ? new Date(donor.last_donation_date) : null;
+          const threeMonthsAgo = new Date();
+          threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+          const status = last ? (last <= threeMonthsAgo ? 'Eligible' : 'Not Eligible') : 'Eligible';
+          return [
+            donor.name || 'N/A',
+            donor.email || 'N/A',
+            donor.phone || 'N/A',
+            donor.age || 'N/A',
+            donor.blood_type || 'Unknown',
+            donor.district || 'N/A',
+            donor.city || 'N/A',
+            last ? last.toLocaleDateString() : 'Never',
+            status,
+            donor.created_at ? new Date(donor.created_at).toLocaleDateString() : 'N/A',
+          ];
+        })
+      ].map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')).join('\n');
 
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -130,7 +142,7 @@ const Donors = () => {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting data:', error);
-      alert('Error exporting data: ' + error.message);
+      alert('Error exporting data: ' + (error?.message || 'Unknown error'));
     }
   };
 
@@ -147,7 +159,6 @@ const Donors = () => {
 
   return (
     <div className="p-6">
-      {/* Admin Panel */}
       {isAdmin && (
         <div className="card p-6 mb-6 bg-red-50 border-red-200">
           <div className="flex justify-between items-center mb-4">
@@ -171,10 +182,8 @@ const Donors = () => {
       </h2>
       <p className="text-gray-600 mb-6">Connect with available donors in your area</p>
 
-      {/* Statistics */}
       <StatsCards donors={donors} />
 
-      {/* Controls */}
       <div className="flex gap-4 mb-6 flex-wrap">
         <button
           onClick={exportData}
@@ -193,7 +202,6 @@ const Donors = () => {
         </button>
       </div>
 
-      {/* Sort Controls */}
       <div className="flex items-center gap-4 mb-6">
         <span className="text-sm font-medium text-gray-700">Sort by:</span>
         <select
@@ -210,7 +218,6 @@ const Donors = () => {
         </select>
       </div>
 
-      {/* Search and Filters */}
       <div className="card p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
           <div className="relative">
@@ -223,7 +230,7 @@ const Donors = () => {
               className="form-input pl-10"
             />
           </div>
-          
+
           <select
             value={filters.bloodType}
             onChange={(e) => handleFilterChange('bloodType', e.target.value)}
@@ -280,20 +287,12 @@ const Donors = () => {
         </div>
       </div>
 
-      {/* Donors Grid */}
       {donors.length === 0 ? (
         <div className="text-center py-12">
           <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
           <h3 className="text-xl font-semibold text-gray-600 mb-2">No donors found</h3>
-          <p className="text-gray-500">
-            Try adjusting your filters to see more results.
-          </p>
-          <button
-              onClick={clearFilters}
-              className="btn-primary mt-4"
-            >
-              Clear All Filters
-            </button>
+          <p className="text-gray-500">Try adjusting your filters to see more results.</p>
+          <button onClick={clearFilters} className="btn-primary mt-4">Clear All Filters</button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -311,7 +310,6 @@ const Donors = () => {
         </div>
       )}
 
-      {/* Edit Modal */}
       <EditModal
         isOpen={editModalOpen}
         onClose={() => setEditModalOpen(false)}

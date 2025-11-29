@@ -90,4 +90,4 @@ const DonorCard = ({
   )
 }
 
-export default DonorCard
+export default React.memo(DonorCard)
