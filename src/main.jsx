@@ -1,7 +1,9 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
-import './index.css'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.jsx';
+import './index.css';
+import { AuthProvider } from './context/AuthContext.jsx';
+import { DonorProvider } from './context/DonorContext.jsx';
 
 // Error boundary for catching errors
 class ErrorBoundary extends React.Component {
@@ -41,7 +43,11 @@ try {
   root.render(
     <React.StrictMode>
       <ErrorBoundary>
-        <App />
+        <AuthProvider>
+          <DonorProvider>
+            <App />
+          </DonorProvider>
+        </AuthProvider>
       </ErrorBoundary>
     </React.StrictMode>
   );

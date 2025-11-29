@@ -1,12 +1,14 @@
-import React, { useState } from 'react'
-import { User, Phone, Cake, Droplets, MapPin, Home, Calendar, Camera } from 'lucide-react'
-import { districts, bloodTypes } from '../utils/helpers'
-import { supabase } from '../services/supabase'
-import { useAuth } from '../context/AuthContext'
+import React, { useState } from 'react';
+import { User, Phone, Cake, Droplets, MapPin, Home, Calendar, Camera } from 'lucide-react';
+import { districts, bloodTypes } from '../utils/helpers';
+import { supabase } from '../services/supabase';
+import { useAuth } from '../context/AuthContext';
+import { useDonors } from '../context/DonorContext';
 
 const Register = () => {
-  const { signUp } = useAuth()
-  const [loading, setLoading] = useState(false)
+  const { signUp } = useAuth();
+  const { refetchDonors } = useDonors();
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -16,90 +18,91 @@ const Register = () => {
     blood_type: '',
     district: '',
     city: '',
-    last_donation_date: ''
-  })
-  const [profilePicture, setProfilePicture] = useState(null)
+    last_donation_date: '',
+  });
+  const [profilePicture, setProfilePicture] = useState(null);
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target
+    const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
-    }))
-  }
+      [name]: value,
+    }));
+  };
 
   const handleProfilePictureChange = (e) => {
-    const file = e.target.files[0]
-    setProfilePicture(file)
-  }
+    const file = e.target.files[0];
+    setProfilePicture(file);
+  };
 
   const handleSubmit = async (e) => {
-  e.preventDefault()
-  setLoading(true)
+    e.preventDefault();
+    setLoading(true);
 
-  try {
-    // Basic validation
-    if (!formData.name || !formData.email || !formData.password || !formData.phone || 
-        !formData.age || !formData.district || !formData.city || !formData.last_donation_date) {
-      throw new Error('Please fill all required fields')
-    }
+    try {
+      // Basic validation
+      if (!formData.name || !formData.email || !formData.password || !formData.phone || 
+          !formData.age || !formData.district || !formData.city || !formData.last_donation_date) {
+        throw new Error('Please fill all required fields');
+      }
 
-    let profilePictureUrl = null
+      let profilePictureUrl = null;
 
-    // Upload profile picture if selected
-    if (profilePicture) {
-      const fileExt = profilePicture.name.split('.').pop()
-      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+      // Upload profile picture if selected
+      if (profilePicture) {
+        const fileExt = profilePicture.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('profile-pictures')
+          .upload(fileName, profilePicture);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('profile-pictures')
+          .getPublicUrl(fileName);
+
+        profilePictureUrl = publicUrl;
+      }
+
+      // Create user account and donor profile
+      await signUp(formData.email, formData.password, {
+        name: formData.name,
+        phone: formData.phone,
+        age: parseInt(formData.age),
+        blood_type: formData.blood_type,
+        district: formData.district,
+        city: formData.city,
+        last_donation_date: formData.last_donation_date,
+        profile_picture: profilePictureUrl,
+        created_at: new Date().toISOString(),
+      });
+
+      alert('Registration successful! You can now sign in.');
+      refetchDonors();
       
-      const { error: uploadError } = await supabase.storage
-        .from('profile-pictures')
-        .upload(fileName, profilePicture)
+      // Reset form
+      setFormData({
+        name: '',
+        email: '',
+        password: '',
+        phone: '',
+        age: '',
+        blood_type: '',
+        district: '',
+        city: '',
+        last_donation_date: '',
+      });
+      setProfilePicture(null);
 
-      if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('profile-pictures')
-        .getPublicUrl(fileName)
-
-      profilePictureUrl = publicUrl
+    } catch (error) {
+      console.error('Registration error:', error);
+      alert(`Registration failed: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
-
-    // Create user account and donor profile
-    await signUp(formData.email, formData.password, {
-      name: formData.name,
-      phone: formData.phone,
-      age: parseInt(formData.age),
-      blood_type: formData.blood_type,
-      district: formData.district,
-      city: formData.city,
-      last_donation_date: formData.last_donation_date,
-      profile_picture: profilePictureUrl,
-      created_at: new Date().toISOString()
-    })
-
-    alert('Registration successful! You can now sign in.')
-    
-    // Reset form
-    setFormData({
-      name: '',
-      email: '',
-      password: '',
-      phone: '',
-      age: '',
-      blood_type: '',
-      district: '',
-      city: '',
-      last_donation_date: ''
-    })
-    setProfilePicture(null)
-
-  } catch (error) {
-    console.error('Registration error:', error)
-    alert(`Registration failed: ${error.message}`)
-  } finally {
-    setLoading(false)
-  }
-}
+  };
 
   return (
     <div className="p-6">
@@ -334,7 +337,7 @@ const Register = () => {
         </form>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Register
+export default Register;

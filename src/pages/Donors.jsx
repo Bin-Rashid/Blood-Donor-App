@@ -1,26 +1,19 @@
-import React, { useState, useEffect } from 'react'
-import { Users, Filter, Download, RefreshCw, Search } from 'lucide-react'
-import { supabase } from '../services/supabase'
-import { useAuth } from '../context/AuthContext'
-import DonorCard from '../components/DonorCard'
-import StatsCards from '../components/StatsCards'
-import EditModal from '../components/EditModal'
-import { districts, bloodTypes } from '../utils/helpers'
+import React, { useState, useEffect } from 'react';
+import { Users, Filter, Download, RefreshCw, Search } from 'lucide-react';
+import { supabase } from '../services/supabase';
+import { useAuth } from '../context/AuthContext';
+import { useDonors } from '../context/DonorContext';
+import DonorCard from '../components/DonorCard';
+import StatsCards from '../components/StatsCards';
+import EditModal from '../components/EditModal';
+import { districts, bloodTypes } from '../utils/helpers';
 
 const Donors = () => {
-  const { isAdmin, user } = useAuth()
-  const [donors, setDonors] = useState([])
-  const [filteredDonors, setFilteredDonors] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [deleteLoading, setDeleteLoading] = useState(null)
-  const [editModalOpen, setEditModalOpen] = useState(false)
-  const [selectedDonor, setSelectedDonor] = useState(null)
-  const [stats, setStats] = useState({
-    totalDonors: 0,
-    eligibleDonors: 0,
-    universalDonors: 0,
-    recentDonors: 0
-  })
+  const { isAdmin, user } = useAuth();
+  const { donors, loading, fetchDonors } = useDonors();
+  const [deleteLoading, setDeleteLoading] = useState(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedDonor, setSelectedDonor] = useState(null);
 
   // Filters
   const [filters, setFilters] = useState({
@@ -29,188 +22,69 @@ const Donors = () => {
     district: '',
     city: '',
     status: '',
-    sortBy: 'name-asc'
-  })
+    sortBy: 'name-asc',
+  });
 
   useEffect(() => {
-    fetchDonors()
-  }, [])
+    fetchDonors(filters, filters.sortBy);
+  }, [filters]);
 
-  useEffect(() => {
-    filterAndSortDonors()
-  }, [donors, filters])
-
-  const fetchDonors = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('donors')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      setDonors(data || [])
-      calculateStats(data || [])
-    } catch (error) {
-      console.error('Error fetching donors:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const calculateStats = (donorList) => {
-    const totalDonors = donorList.length
-    const eligibleDonors = donorList.filter(donor => {
-      const lastDonation = new Date(donor.last_donation_date)
-      const threeMonthsAgo = new Date()
-      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-      return lastDonation <= threeMonthsAgo
-    }).length
-
-    const universalDonors = donorList.filter(donor => donor.blood_type === 'O-').length
+  const handleDeleteDonor = async (donor) => {
+    const canDelete = isAdmin || user?.id === donor.id;
     
-    const oneWeekAgo = new Date()
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-    const recentDonors = donorList.filter(donor => 
-      new Date(donor.created_at) >= oneWeekAgo
-    ).length
+    if (!canDelete) {
+      alert('You can only delete your own profile');
+      return;
+    }
 
-    setStats({
-      totalDonors,
-      eligibleDonors,
-      universalDonors,
-      recentDonors
-    })
-  }
+    if (!window.confirm(`Are you sure you want to delete ${donor.name}? This action cannot be undone.`)) {
+      return;
+    }
 
-  // DELETE FUNCTION - Properly Implemented  
-        const handleDeleteDonor = (donor) => {
-        // Check if user has permission to delete
-        const canDelete = isAdmin || user?.id === donor.id;
-        
-        if (!canDelete) {
-            alert('You can only delete your own profile');
-            return;
-        }
+    setDeleteLoading(donor.id);
 
-        if (!window.confirm(`Are you sure you want to delete ${donor.name}? This action cannot be undone.`)) {
-            return;
-        }
+    try {
+      const { error } = await supabase
+        .from('donors')
+        .delete()
+        .eq('id', donor.id);
 
-        setDeleteLoading(donor.id);
+      if (error) throw error;
 
-        // Actual delete implementation
-        const deleteDonor = async () => {
-            try {
-            const { error } = await supabase
-                .from('donors')
-                .delete()
-                .eq('id', donor.id)
+      fetchDonors(filters, filters.sortBy); // Refetch to ensure data consistency
+      alert('Profile deleted successfully!');
+      
+    } catch (error) {
+      console.error('Error deleting donor:', error);
+      alert('Error deleting profile: ' + error.message);
+    } finally {
+      setDeleteLoading(null);
+    }
+  };
 
-            if (error) throw error
-
-            // Remove from local state
-            setDonors(prev => prev.filter(d => d.id !== donor.id))
-            alert('Profile deleted successfully!')
-            
-            } catch (error) {
-            console.error('Error deleting donor:', error)
-            alert('Error deleting profile: ' + error.message)
-            } finally {
-            setDeleteLoading(null)
-            }
-        }
-
-        deleteDonor();
-        }
-
-  // EDIT FUNCTION
   const handleEditDonor = (donor) => {
     const canEdit = isAdmin || user?.id === donor.id;
 
     if (!canEdit) {
-    alert('You can only edit your own profile');
-    return;
-  }
-    setSelectedDonor(donor)
-    setEditModalOpen(true)
-  }
+      alert('You can only edit your own profile');
+      return;
+    }
+    
+    setSelectedDonor(donor);
+    setEditModalOpen(true);
+  };
 
   const handleUpdateDonor = () => {
-    // Refresh the donors list after update
-    fetchDonors()
-  }
-
-  const filterAndSortDonors = () => {
-    let filtered = [...donors]
-
-    // Apply filters
-    if (filters.search) {
-      filtered = filtered.filter(donor =>
-        donor.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-        donor.phone.includes(filters.search)
-      )
-    }
-
-    if (filters.bloodType) {
-      filtered = filtered.filter(donor => donor.blood_type === filters.bloodType)
-    }
-
-    if (filters.district) {
-      filtered = filtered.filter(donor => donor.district === filters.district)
-    }
-
-    if (filters.city) {
-      filtered = filtered.filter(donor =>
-        donor.city.toLowerCase().includes(filters.city.toLowerCase())
-      )
-    }
-
-    if (filters.status) {
-      const today = new Date()
-      const threeMonthsAgo = new Date()
-      threeMonthsAgo.setMonth(today.getMonth() - 3)
-
-      if (filters.status === 'eligible') {
-        filtered = filtered.filter(donor =>
-          new Date(donor.last_donation_date) <= threeMonthsAgo
-        )
-      } else if (filters.status === 'not-eligible') {
-        filtered = filtered.filter(donor =>
-          new Date(donor.last_donation_date) > threeMonthsAgo
-        )
-      }
-    }
-
-    // Apply sorting
-    filtered.sort((a, b) => {
-      switch (filters.sortBy) {
-        case 'name-asc':
-          return a.name.localeCompare(b.name)
-        case 'name-desc':
-          return b.name.localeCompare(a.name)
-        case 'age-asc':
-          return a.age - b.age
-        case 'age-desc':
-          return b.age - a.age
-        case 'date-asc':
-          return new Date(a.created_at) - new Date(b.created_at)
-        case 'date-desc':
-          return new Date(b.created_at) - new Date(a.created_at)
-        default:
-          return 0
-      }
-    })
-
-    setFilteredDonors(filtered)
-  }
+    fetchDonors(filters, filters.sortBy);
+    setEditModalOpen(false);
+  };
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({
       ...prev,
-      [key]: value
-    }))
-  }
+      [key]: value,
+    }));
+  };
 
   const clearFilters = () => {
     setFilters({
@@ -219,33 +93,46 @@ const Donors = () => {
       district: '',
       city: '',
       status: '',
-      sortBy: 'name-asc'
-    })
-  }
+      sortBy: 'name-asc',
+    });
+  };
 
   const exportData = () => {
-    const csvContent = [
-      ['Name', 'Phone', 'Age', 'Blood Type', 'District', 'City', 'Last Donation', 'Status'],
-      ...filteredDonors.map(donor => [
-        donor.name,
-        donor.phone,
-        donor.age,
-        donor.blood_type,
-        donor.district,
-        donor.city,
-        new Date(donor.last_donation_date).toLocaleDateString(),
-        new Date(donor.last_donation_date) <= new Date(new Date().setMonth(new Date().getMonth() - 3)) ? 'Eligible' : 'Not Eligible'
-      ])
-    ].map(row => row.join(',')).join('\n')
+    try {
+      const csvContent = [
+        ['Name', 'Email', 'Phone', 'Age', 'Blood Type', 'District', 'City', 'Last Donation', 'Status', 'Registration Date'],
+        ...donors.map(donor => [
+          donor.name || 'N/A',
+          donor.email || 'N/A',
+          donor.phone || 'N/A',
+          donor.age || 'N/A',
+          donor.blood_type || 'Unknown',
+          donor.district || 'N/A',
+          donor.city || 'N/A',
+          donor.last_donation_date ? new Date(donor.last_donation_date).toLocaleDateString() : 'Never',
+          donor.last_donation_date ? 
+            (new Date(donor.last_donation_date) <= new Date(new Date().setMonth(new Date().getMonth() - 3)) ? 'Eligible' : 'Not Eligible') 
+            : 'Eligible',
+          donor.created_at ? new Date(donor.created_at).toLocaleDateString() : 'N/A',
+        ]),
+      ].map(row => 
+        row.map(field => `"${field}"`).join(',')
+      ).join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'blood-donors.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `blood-donors-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      alert('Error exporting data: ' + error.message);
+    }
+  };
 
   if (loading) {
     return (
@@ -255,7 +142,7 @@ const Donors = () => {
           <p className="text-gray-600">Loading donors...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -268,17 +155,12 @@ const Donors = () => {
               <Users className="w-5 h-5" />
               Admin Panel
             </h3>
-            <div className="flex gap-2">
-              <button className="btn-outline py-2 text-sm">
-                Edit Footer
-              </button>
-              <button className="btn-outline py-2 text-sm">
-                Logout Admin
-              </button>
+            <div className="text-sm text-gray-600">
+              You have full access to manage all donor records
             </div>
           </div>
           <p className="text-gray-600">
-            You are logged in as an administrator. You can now edit and delete donor records.
+            You are logged in as an administrator. You can now edit and delete all donor records.
           </p>
         </div>
       )}
@@ -290,21 +172,21 @@ const Donors = () => {
       <p className="text-gray-600 mb-6">Connect with available donors in your area</p>
 
       {/* Statistics */}
-      <StatsCards stats={stats} />
+      <StatsCards donors={donors} />
 
-      {/* Admin Controls */}
+      {/* Controls */}
       <div className="flex gap-4 mb-6 flex-wrap">
         <button
           onClick={exportData}
-          className="btn-primary py-2"
-          disabled={filteredDonors.length === 0}
+          className="btn-primary py-2 flex items-center gap-2"
+          disabled={donors.length === 0}
         >
           <Download className="w-4 h-4" />
-          Export Data
+          Export Data ({donors.length})
         </button>
         <button
-          onClick={fetchDonors}
-          className="btn-outline py-2"
+          onClick={() => fetchDonors(filters, filters.sortBy)}
+          className="btn-outline py-2 flex items-center gap-2"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh Data
@@ -323,8 +205,8 @@ const Donors = () => {
           <option value="name-desc">Name (Z-A)</option>
           <option value="age-asc">Age (Low to High)</option>
           <option value="age-desc">Age (High to Low)</option>
-          <option value="date-asc">Registration Date (Oldest)</option>
-          <option value="date-desc">Registration Date (Newest)</option>
+          <option value="created_at-asc">Registration Date (Oldest)</option>
+          <option value="created_at-desc">Registration Date (Newest)</option>
         </select>
       </div>
 
@@ -335,7 +217,7 @@ const Donors = () => {
             <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by name or phone..."
+              placeholder="Search by name, phone, or email..."
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
               className="form-input pl-10"
@@ -385,11 +267,12 @@ const Donors = () => {
 
         <div className="flex justify-between items-center">
           <p className="text-sm text-gray-600">
-            Showing {filteredDonors.length} of {donors.length} donors
+            Showing {donors.length} donors
+            {filters.search && ` for "${filters.search}"`}
           </p>
           <button
             onClick={clearFilters}
-            className="btn-outline py-2 text-sm"
+            className="btn-outline py-2 text-sm flex items-center gap-2"
           >
             <Filter className="w-4 h-4" />
             Clear Filters
@@ -398,25 +281,28 @@ const Donors = () => {
       </div>
 
       {/* Donors Grid */}
-      {filteredDonors.length === 0 ? (
+      {donors.length === 0 ? (
         <div className="text-center py-12">
           <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
           <h3 className="text-xl font-semibold text-gray-600 mb-2">No donors found</h3>
           <p className="text-gray-500">
-            {donors.length === 0 
-              ? 'No donors have registered yet. Be the first to register!'
-              : 'Try adjusting your filters to see more results.'
-            }
+            Try adjusting your filters to see more results.
           </p>
+          <button
+              onClick={clearFilters}
+              className="btn-primary mt-4"
+            >
+              Clear All Filters
+            </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredDonors.map(donor => (
+          {donors.map(donor => (
             <DonorCard
               key={donor.id}
               donor={donor}
-              onEdit={() => handleEditDonor(donor)} // এখানে change করুন
-              onDelete={() => handleDeleteDonor(donor)} // এখানে change করুন
+              onEdit={() => handleEditDonor(donor)}
+              onDelete={() => handleDeleteDonor(donor)}
               deleteLoading={deleteLoading === donor.id}
               isAdmin={isAdmin}
               currentUserId={user?.id}
@@ -433,7 +319,7 @@ const Donors = () => {
         onUpdate={handleUpdateDonor}
       />
     </div>
-  )
-}
+  );
+};
 
-export default Donors
+export default Donors;

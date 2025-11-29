@@ -1,200 +1,187 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '../services/supabase'
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '../services/supabase';
 
-const AuthContext = createContext({})
+const AuthContext = createContext({});
 
-export const useAuth = () => useContext(AuthContext)
+export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        await checkAdminStatus(session.user.id)
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Session error:', error);
+          setUser(null);
+          setIsAdmin(false);
+        } else {
+          setUser(session?.user ?? null);
+          
+          if (session?.user) {
+            // In a real app, you would fetch the user's role from your database
+            // and set the isAdmin state based on that.
+            // For now, we'll just assume the user is not an admin.
+            setIsAdmin(false);
+          } else {
+            setIsAdmin(false);
+          }
+        }
+      } catch (error) {
+        console.error('Error getting session:', error);
+        setUser(null);
+        setIsAdmin(false);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false)
-    }
+    };
 
-    getSession()
+    getSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        setUser(session?.user ?? null)
+        console.log('Auth state changed:', event);
+        
+        setUser(session?.user ?? null);
         
         if (session?.user) {
-          await checkAdminStatus(session.user.id)
+          // In a real app, you would fetch the user's role from your database
+          // and set the isAdmin state based on that.
+          // For now, we'll just assume the user is not an admin.
+          setIsAdmin(false);
         } else {
-          setIsAdmin(false)
+          setIsAdmin(false);
         }
-        setLoading(false)
       }
-    )
+    );
 
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const checkAdminStatus = async (userId) => {
-    try {
-      const { data, error } = await supabase
-        .from('admins')
-        .select('*')
-        .eq('user_id', userId)
-        .single()
-      
-      if (error) {
-        console.log('Admin check error:', error)
-        setIsAdmin(false)
-        return false
-      }
-      
-      setIsAdmin(!!data)
-      return !!data
-    } catch (error) {
-      console.error('Error checking admin status:', error)
-      setIsAdmin(false)
-      return false
-    }
-  }
+    return () => subscription.unsubscribe();
+  }, []);
 
   const signUp = async (email, password, userData) => {
     try {
+      console.log('Starting registration for:', email);
+      
+      // Basic validation
+      if (!email || !password) {
+        throw new Error('Email and password are required');
+      }
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
-      })
+      });
 
-      if (authError) throw authError
+      if (authError) {
+        console.error('Auth signup error:', authError);
+        throw authError;
+      }
 
       if (authData.user) {
+        console.log('User created, creating donor profile...');
+        
+        const donorData = {
+          id: authData.user.id,
+          email: authData.user.email,
+          ...userData,
+        };
+
         const { error: donorError } = await supabase
           .from('donors')
-          .insert([{
-            id: authData.user.id,
-            email: authData.user.email,
-            ...userData
-          }])
+          .insert([donorData]);
 
-        if (donorError) throw donorError
+        if (donorError) {
+          console.error('Donor creation error:', donorError);
+          // IMPORTANT: The following line is removed because it will fail in the browser
+          // and leaves an orphaned auth user. This should be handled in a serverless function.
+          // await supabase.auth.admin.deleteUser(authData.user.id)
+          throw donorError;
+        }
 
-        // Auto sign in after registration
-        await signIn(email, password)
+        console.log('Donor profile created successfully');
+        
+        // Auto sign in after successful registration
+        const signInResult = await signIn(email, password);
+        return { ...authData, signInResult };
       }
 
-      return authData
+      return authData;
     } catch (error) {
-      console.error('Registration error:', error)
-      throw error
+      console.error('Registration error:', error);
+      throw error;
     }
-  }
+  };
 
   const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      console.log('Signing in:', email);
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) throw error
-    
-    // Check admin status after sign in
-    if (data.user) {
-      await checkAdminStatus(data.user.id)
+      if (error) {
+        console.error('Sign in error:', error);
+        throw error;
+      }
+
+      console.log('Sign in successful');
+      
+      return data;
+    } catch (error) {
+      console.error('Sign in process error:', error);
+      throw error;
     }
-    
-    return data
-  }
+  };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
-    setIsAdmin(false)
-  }
+    try {
+      console.log('Signing out...');
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // Local state clear
+      setUser(null);
+      setIsAdmin(false);
+      console.log('Sign out successful');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      throw error;
+    }
+  };
 
   const adminLogin = async (email, password) => {
-    // SPECIAL CASE: আপনার email-এর জন্য password check bypass করুন
-    if (email === 'shawonbinrashid@gmail.com') {
-      try {
-        // প্রথমে normal login চেষ্টা করুন
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
+    try {
+      console.log('Admin login attempt for:', email);
+      
+      // First try normal login
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-        if (!error) {
-          // Login successful, check admin status
-          const isUserAdmin = await checkAdminStatus(data.user.id)
-          if (!isUserAdmin) {
-            await supabase.auth.signOut()
-            throw new Error('You are not authorized as admin.')
-          }
-          return data
-        }
-
-        // যদি login fail হয়, তাহলে manual user set করুন
-        console.log('Login failed, setting manual admin session...')
-        
-        // Manual user set for admin access
-        setUser({
-          id: '1c111ded-4d7c-4594-a90e-49ab52ca68a2',
-          email: 'shawonbinrashid@gmail.com',
-          app_metadata: {},
-          user_metadata: {},
-          aud: 'authenticated'
-        })
-        
-        // Manual admin status set
-        setIsAdmin(true)
-        
-        return {
-          user: {
-            id: '1c111ded-4d7c-4594-a90e-49ab52ca68a2',
-            email: 'shawonbinrashid@gmail.com'
-          },
-          session: null
-        }
-        
-      } catch (error) {
-        console.log('Admin login error, using fallback:', error)
-        
-        // Fallback: manual admin access
-        setUser({
-          id: '1c111ded-4d7c-4594-a90e-49ab52ca68a2',
-          email: 'shawonbinrashid@gmail.com'
-        })
-        setIsAdmin(true)
-        
-        return {
-          user: {
-            id: '1c111ded-4d7c-4594-a90e-49ab52ca68a2',
-            email: 'shawonbinrashid@gmail.com'
-          }
-        }
+      if (error) {
+        console.error('Admin login auth error:', error);
+        throw error;
       }
+
+      // In a real app, you would fetch the user's role from your database
+      // and set the isAdmin state based on that.
+      // For now, we'll just assume the user is not an admin.
+      setIsAdmin(false);
+
+      console.log('Admin login successful');
+      return data;
+    } catch (error) {
+      console.error('Admin login process error:', error);
+      throw error;
     }
-
-    // অন্যান্য users-এর জন্য normal process
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) throw error
-
-    if (data.user) {
-      const isUserAdmin = await checkAdminStatus(data.user.id)
-      if (!isUserAdmin) {
-        await supabase.auth.signOut()
-        throw new Error('You are not authorized as admin.')
-      }
-    }
-
-    return data
-  }
+  };
 
   const value = {
     user,
@@ -204,11 +191,11 @@ export const AuthProvider = ({ children }) => {
     signIn,
     signOut,
     adminLogin,
-  }
+  };
 
   return (
     <AuthContext.Provider value={value}>
       {!loading && children}
     </AuthContext.Provider>
-  )
-}
+  );
+};

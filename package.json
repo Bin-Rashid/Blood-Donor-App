@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite -- --future v7_startTransition,v7_relativeSplatPath",
-    "build": "vite build -- --future v7_startTransition,v7_relativeSplatPath",
+    "dev": "vite",
+    "build": "vite build",
     "preview": "vite preview",
     "start": "vite"
   },
