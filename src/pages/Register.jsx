@@ -145,11 +145,12 @@ const Register = () => {
 
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+            <label htmlFor="register-name" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
               <User className="w-4 h-4" />
               Full Name *
             </label>
             <input
+              id="register-name"
               type="text"
               name="name"
               value={formData.name}
@@ -163,10 +164,11 @@ const Register = () => {
           {/* Email and Password */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="register-email" className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address *
               </label>
               <input
+                id="register-email"
                 type="email"
                 name="email"
                 value={formData.email}
@@ -177,10 +179,11 @@ const Register = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="register-password" className="block text-sm font-medium text-gray-700 mb-2">
                 Password *
               </label>
               <input
+                id="register-password"
                 type="password"
                 name="password"
                 value={formData.password}
@@ -196,11 +199,12 @@ const Register = () => {
           {/* Phone and Age */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+              <label htmlFor="register-phone" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <Phone className="w-4 h-4" />
                 Phone Number *
               </label>
               <input
+                id="register-phone"
                 type="tel"
                 name="phone"
                 value={formData.phone}
@@ -211,11 +215,12 @@ const Register = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+              <label htmlFor="register-age" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <Cake className="w-4 h-4" />
                 Age *
               </label>
               <input
+                id="register-age"
                 type="number"
                 name="age"
                 value={formData.age}
@@ -232,11 +237,12 @@ const Register = () => {
           {/* Blood Type and District */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+              <label htmlFor="register-blood-type" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <Droplets className="w-4 h-4" />
                 Blood Type
               </label>
               <select
+                id="register-blood-type"
                 name="blood_type"
                 value={formData.blood_type}
                 onChange={handleInputChange}
@@ -249,11 +255,12 @@ const Register = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+              <label htmlFor="register-district" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <MapPin className="w-4 h-4" />
                 District *
               </label>
               <select
+                id="register-district"
                 name="district"
                 value={formData.district}
                 onChange={handleInputChange}
@@ -270,11 +277,12 @@ const Register = () => {
 
           {/* City */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+            <label htmlFor="register-city" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
               <Home className="w-4 h-4" />
               City/Area *
             </label>
             <input
+              id="register-city"
               type="text"
               name="city"
               value={formData.city}
@@ -287,11 +295,12 @@ const Register = () => {
 
           {/* Last Donation Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+            <label htmlFor="register-last-donation" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
               <Calendar className="w-4 h-4" />
               Last Donation Date *
             </label>
             <input
+              id="register-last-donation"
               type="date"
               name="last_donation_date"
               value={formData.last_donation_date}

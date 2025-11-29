@@ -84,12 +84,14 @@ const AuthModal = ({ isOpen, onClose }) => {
             // Login Form
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                   <input
+                    id="login-email"
+                    name="email"
                     type="email"
                     value={loginData.email}
                     onChange={(e) => setLoginData(prev => ({...prev, email: e.target.value}))}
@@ -101,12 +103,14 @@ const AuthModal = ({ isOpen, onClose }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-2">
                   Password
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                   <input
+                    id="login-password"
+                    name="password"
                     type="password"
                     value={loginData.password}
                     onChange={(e) => setLoginData(prev => ({...prev, password: e.target.value}))}
@@ -129,11 +133,13 @@ const AuthModal = ({ isOpen, onClose }) => {
             // Registration Form
             <form onSubmit={handleRegister} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <label htmlFor="modal-name" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   <User className="w-4 h-4" />
                   Full Name *
                 </label>
                 <input
+                  id="modal-name"
+                  name="name"
                   type="text"
                   value={registerData.name}
                   onChange={(e) => setRegisterData(prev => ({...prev, name: e.target.value}))}
@@ -144,10 +150,12 @@ const AuthModal = ({ isOpen, onClose }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="modal-email" className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address *
                 </label>
                 <input
+                  id="modal-email"
+                  name="email"
                   type="email"
                   value={registerData.email}
                   onChange={(e) => setRegisterData(prev => ({...prev, email: e.target.value}))}
@@ -158,10 +166,12 @@ const AuthModal = ({ isOpen, onClose }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="modal-password" className="block text-sm font-medium text-gray-700 mb-2">
                   Password *
                 </label>
                 <input
+                  id="modal-password"
+                  name="password"
                   type="password"
                   value={registerData.password}
                   onChange={(e) => setRegisterData(prev => ({...prev, password: e.target.value}))}
@@ -174,11 +184,13 @@ const AuthModal = ({ isOpen, onClose }) => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <label htmlFor="modal-phone" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                     <Phone className="w-4 h-4" />
                     Phone *
                   </label>
                   <input
+                    id="modal-phone"
+                    name="phone"
                     type="tel"
                     value={registerData.phone}
                     onChange={(e) => setRegisterData(prev => ({...prev, phone: e.target.value}))}
@@ -188,11 +200,13 @@ const AuthModal = ({ isOpen, onClose }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <label htmlFor="modal-age" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                     <Cake className="w-4 h-4" />
                     Age *
                   </label>
                   <input
+                    id="modal-age"
+                    name="age"
                     type="number"
                     value={registerData.age}
                     onChange={(e) => setRegisterData(prev => ({...prev, age: e.target.value}))}
@@ -207,11 +221,13 @@ const AuthModal = ({ isOpen, onClose }) => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <label htmlFor="modal-blood-type" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                     <Droplets className="w-4 h-4" />
                     Blood Type
                   </label>
                   <select
+                    id="modal-blood-type"
+                    name="blood_type"
                     value={registerData.blood_type}
                     onChange={(e) => setRegisterData(prev => ({...prev, blood_type: e.target.value}))}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all"
@@ -223,11 +239,13 @@ const AuthModal = ({ isOpen, onClose }) => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <label htmlFor="modal-district" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
                     District *
                   </label>
                   <select
+                    id="modal-district"
+                    name="district"
                     value={registerData.district}
                     onChange={(e) => setRegisterData(prev => ({...prev, district: e.target.value}))}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all"
@@ -242,11 +260,13 @@ const AuthModal = ({ isOpen, onClose }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <label htmlFor="modal-city" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   <Home className="w-4 h-4" />
                   City/Area *
                 </label>
                 <input
+                  id="modal-city"
+                  name="city"
                   type="text"
                   value={registerData.city}
                   onChange={(e) => setRegisterData(prev => ({...prev, city: e.target.value}))}
@@ -257,11 +277,13 @@ const AuthModal = ({ isOpen, onClose }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <label htmlFor="modal-last-donation" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
                   Last Donation Date *
                 </label>
                 <input
+                  id="modal-last-donation"
+                  name="last_donation_date"
                   type="date"
                   value={registerData.last_donation_date}
                   onChange={(e) => setRegisterData(prev => ({...prev, last_donation_date: e.target.value}))}
