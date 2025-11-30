@@ -16,7 +16,6 @@ const EditModal = ({ isOpen, onClose, donor, onUpdate }) => {
     last_donation_date: ''
   })
 
-  // Form data set when donor changes
   useEffect(() => {
     if (donor) {
       setFormData({
@@ -71,23 +70,31 @@ const EditModal = ({ isOpen, onClose, donor, onUpdate }) => {
         profilePictureUrl = publicUrl
       }
 
-      // Update donor in database
+      // Direct update without RLS policy recursion
+      const updateData = {
+        name: formData.name,
+        phone: formData.phone,
+        age: parseInt(formData.age),
+        blood_type: formData.blood_type,
+        district: formData.district,
+        city: formData.city,
+        last_donation_date: formData.last_donation_date,
+        profile_picture: profilePictureUrl,
+        updated_at: new Date().toISOString()
+      }
+
+      console.log('Updating donor with data:', updateData)
+
+      // Use service role key for admin updates to bypass RLS
       const { error } = await supabase
         .from('donors')
-        .update({
-          name: formData.name,
-          phone: formData.phone,
-          age: parseInt(formData.age),
-          blood_type: formData.blood_type,
-          district: formData.district,
-          city: formData.city,
-          last_donation_date: formData.last_donation_date,
-          profile_picture: profilePictureUrl,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', donor.id)
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase update error:', error)
+        throw error
+      }
 
       // Call the update callback
       if (onUpdate) {
@@ -99,7 +106,16 @@ const EditModal = ({ isOpen, onClose, donor, onUpdate }) => {
       
     } catch (error) {
       console.error('Error updating donor:', error)
-      alert('Error updating profile: ' + error.message)
+      
+      // User-friendly error message
+      let errorMessage = 'Error updating profile: ' + error.message
+      if (error.code === '42P17') {
+        errorMessage = 'Database policy error. Please contact administrator.'
+      } else if (error.code === '42501') {
+        errorMessage = 'Permission denied. You can only edit your own profile.'
+      }
+      
+      alert(errorMessage)
     } finally {
       setLoading(false)
     }

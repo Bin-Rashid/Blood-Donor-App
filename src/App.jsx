@@ -1,13 +1,16 @@
+// src/App.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { useDonors } from './context/DonorContext';
 
 import Header from './components/Header';
-import Footer from './components/Footer';
+import Footer from './components/Footer'; // ✅ এই import টি চেক করুন
 import Register from './pages/Register';
 import Donors from './pages/Donors';
+import ResetPassword from './pages/ResetPassword';
 import AdminModal from './components/AdminModal';
+import GuidelinesPopup from './components/GuidelinesPopup'; // নতুন কম্পোনেন্ট
 
 import { supabase } from './services/supabase';
 import './index.css';
@@ -26,9 +29,10 @@ function AppContent() {
   const [heroSettings, setHeroSettings] = useState({
     text: 'Connecting blood donors with those in need. Your single donation can save up to three lives.',
     whatsapp_number: '+880XXXXXXXXX',
-    instructions_text: 'Find Blood Donors Connect with available donors in your area',
+    instructions_text: 'জীবন বাঁচাতে রক্তদান করুন', // আপডেট করা
   });
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const [showGuidelinesPopup, setShowGuidelinesPopup] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const { isAdmin } = useAuth();
@@ -38,6 +42,12 @@ function AppContent() {
     const initializeApp = async () => {
       try {
         await fetchHeroSettings();
+        
+        // Guidelines popup check
+        const hasSeenGuidelines = localStorage.getItem('hasSeenGuidelines');
+        if (!hasSeenGuidelines) {
+          setShowGuidelinesPopup(true);
+        }
       } catch (error) {
         console.error('Error initializing app:', error);
       } finally {
@@ -62,7 +72,7 @@ function AppContent() {
         setHeroSettings({
           text: settings.text || 'Connecting blood donors with those in need. Your single donation can save up to three lives.',
           whatsapp_number: settings.whatsapp_number || '+880XXXXXXXXX',
-          instructions_text: settings.instructions_text || 'Find Blood Donors Connect with available donors in your area',
+          instructions_text: settings.instructions_text || 'জীবন বাঁচাতে রক্তদান করুন',
         });
       }
     } catch (error) {
@@ -76,6 +86,11 @@ function AppContent() {
     }
   };
 
+  const handleCloseGuidelinesPopup = () => {
+    localStorage.setItem('hasSeenGuidelines', 'true');
+    setShowGuidelinesPopup(false);
+  };
+
   const updateHeroSettings = async (newSettings) => {
     try {
       const { data: existingData } = await supabase
@@ -84,7 +99,7 @@ function AppContent() {
         .single();
 
       let error;
-      
+
       if (existingData?.id) {
         const { error: updateError } = await supabase
           .from('hero_settings')
@@ -129,6 +144,7 @@ function AppContent() {
             <Route path="/" element={<Register />} />
             <Route path="/register" element={<Register />} />
             <Route path="/donors" element={<Donors />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
           </Routes>
         </main>
 
@@ -145,6 +161,11 @@ function AppContent() {
             onSave={updateHeroSettings}
           />
         )}
+
+        <GuidelinesPopup 
+          isOpen={showGuidelinesPopup}
+          onClose={handleCloseGuidelinesPopup}
+        />
       </div>
     </div>
   );

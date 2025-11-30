@@ -158,7 +158,7 @@ export const AuthProvider = ({ children }) => {
   const adminLogin = async (email, password) => {
     try {
       console.log('Admin login attempt for:', email);
-      
+
       // First try normal login
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -183,6 +183,27 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const forgotPassword = async (email) => {
+    try {
+      console.log('Sending password reset email to:', email);
+
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        console.error('Password reset error:', error);
+        throw error;
+      }
+
+      console.log('Password reset email sent successfully');
+      return data;
+    } catch (error) {
+      console.error('Password reset process error:', error);
+      throw error;
+    }
+  };
+
   const value = {
     user,
     isAdmin,
@@ -191,6 +212,7 @@ export const AuthProvider = ({ children }) => {
     signIn,
     signOut,
     adminLogin,
+    forgotPassword,
   };
 
   return (

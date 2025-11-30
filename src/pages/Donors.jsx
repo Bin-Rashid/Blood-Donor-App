@@ -1,19 +1,21 @@
 // src/pages/Donors.jsx
 import React, { useState, useEffect } from 'react';
-import { Users, Filter, Download, RefreshCw, Search } from 'lucide-react';
+import { Users, Filter, Download, RefreshCw, Search, Info, BookOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useDonors } from '../context/DonorContext';
 import DonorCard from '../components/DonorCard';
 import StatsCards from '../components/StatsCards';
 import EditModal from '../components/EditModal';
+import GuidelinesTab from '../components/GuidelinesTab';
 import { districts, bloodTypes, useDebounce } from '../utils/helpers';
 
 const Donors = () => {
-  const { isAdmin, user } = useAuth?.() || { isAdmin: false, user: null }; // defensive
+  const { isAdmin, user } = useAuth?.() || { isAdmin: false, user: null };
   const { donors, loading, fetchDonors } = useDonors();
   const [deleteLoading, setDeleteLoading] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedDonor, setSelectedDonor] = useState(null);
+  const [activeSubTab, setActiveSubTab] = useState('guidelines');
 
   // Filters
   const [filters, setFilters] = useState({
@@ -29,8 +31,10 @@ const Donors = () => {
 
   // Fetch donors when debounced filters change
   useEffect(() => {
-    fetchDonors(debouncedFilters, debouncedFilters.sortBy);
-  }, [debouncedFilters, fetchDonors]);
+    if (activeSubTab === 'find-donors') {
+      fetchDonors(debouncedFilters, debouncedFilters.sortBy);
+    }
+  }, [debouncedFilters, fetchDonors, activeSubTab]);
 
   const handleDeleteDonor = async (donor) => {
     const canDelete = isAdmin || user?.id === donor.id;
@@ -47,16 +51,11 @@ const Donors = () => {
     setDeleteLoading(donor.id);
 
     try {
-      // call Supabase delete via service (we keep using supabase directly in card)
       const { error } = await fetch(`/api/delete-donor`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: donor.id })
-      }).then(r => r.json()); // If you prefer direct supabase client, keep your old logic
-
-      // Fallback: if you don't have an /api route, use original supabase code:
-      // import { supabase } from '../services/supabase';
-      // const { error } = await supabase.from('donors').delete().eq('id', donor.id);
+      }).then(r => r.json());
 
       if (error) throw error;
 
@@ -139,7 +138,7 @@ const Donors = () => {
     }
   };
 
-  if (loading) {
+  if (loading && activeSubTab === 'find-donors') {
     return (
       <div className="p-6 flex justify-center items-center min-h-64">
         <div className="text-center">
@@ -171,136 +170,170 @@ const Donors = () => {
 
       <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-2">
         <Users className="w-6 h-6" />
-        Find Blood Donors
+        Find Donors
       </h2>
       <p className="text-gray-600 mb-6">Connect with available donors in your area</p>
 
-      <StatsCards donors={donors} />
-
-      <div className="flex gap-4 mb-6 flex-wrap">
+      {/* Sub Tabs */}
+      <div className="flex border-b border-gray-200 mb-6">
         <button
-          onClick={exportData}
-          className="btn-primary py-2 flex items-center gap-2"
-          disabled={donors.length === 0}
+          onClick={() => setActiveSubTab('guidelines')}
+          className={`flex items-center gap-2 px-4 py-3 font-medium transition-all ${
+            activeSubTab === 'guidelines'
+              ? 'text-red-600 border-b-2 border-red-600'
+              : 'text-gray-600 hover:text-red-600'
+          }`}
         >
-          <Download className="w-4 h-4" />
-          Export Data ({donors.length})
+          <BookOpen className="w-4 h-4" />
+          গুরুত্বপূর্ণ দিকনির্দেশনা
         </button>
         <button
-          onClick={() => fetchDonors(filters, filters.sortBy)}
-          className="btn-outline py-2 flex items-center gap-2"
+          onClick={() => setActiveSubTab('find-donors')}
+          className={`flex items-center gap-2 px-4 py-3 font-medium transition-all ${
+            activeSubTab === 'find-donors'
+              ? 'text-red-600 border-b-2 border-red-600'
+              : 'text-gray-600 hover:text-red-600'
+          }`}
         >
-          <RefreshCw className="w-4 h-4" />
-          Refresh Data
+          <Users className="w-4 h-4" />
+          Find Blood Donors
         </button>
       </div>
 
-      <div className="flex items-center gap-4 mb-6">
-        <span className="text-sm font-medium text-gray-700">Sort by:</span>
-        <select
-          value={filters.sortBy}
-          onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-          className="form-input w-auto"
-        >
-          <option value="name-asc">Name (A-Z)</option>
-          <option value="name-desc">Name (Z-A)</option>
-          <option value="age-asc">Age (Low to High)</option>
-          <option value="age-desc">Age (High to Low)</option>
-          <option value="created_at-asc">Registration Date (Oldest)</option>
-          <option value="created_at-desc">Registration Date (Newest)</option>
-        </select>
-      </div>
+      {/* Guidelines Tab Content */}
+      {activeSubTab === 'guidelines' && <GuidelinesTab />}
 
-      <div className="card p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by name, phone, or email..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="form-input pl-10"
-            />
+      {/* Find Donors Tab Content */}
+      {activeSubTab === 'find-donors' && (
+        <>
+          <StatsCards donors={donors} />
+
+          <div className="flex gap-4 mb-6 flex-wrap">
+            <button
+              onClick={exportData}
+              className="btn-primary py-2 flex items-center gap-2"
+              disabled={donors.length === 0}
+            >
+              <Download className="w-4 h-4" />
+              Export Data ({donors.length})
+            </button>
+            <button
+              onClick={() => fetchDonors(filters, filters.sortBy)}
+              className="btn-outline py-2 flex items-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh Data
+            </button>
           </div>
 
-          <select
-            value={filters.bloodType}
-            onChange={(e) => handleFilterChange('bloodType', e.target.value)}
-            className="form-input"
-          >
-            <option value="">All Blood Types</option>
-            {bloodTypes.map(type => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </select>
+          <div className="flex items-center gap-4 mb-6">
+            <span className="text-sm font-medium text-gray-700">Sort by:</span>
+            <select
+              value={filters.sortBy}
+              onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+              className="form-input w-auto"
+            >
+              <option value="name-asc">Name (A-Z)</option>
+              <option value="name-desc">Name (Z-A)</option>
+              <option value="age-asc">Age (Low to High)</option>
+              <option value="age-desc">Age (High to Low)</option>
+              <option value="created_at-asc">Registration Date (Oldest)</option>
+              <option value="created_at-desc">Registration Date (Newest)</option>
+            </select>
+          </div>
 
-          <select
-            value={filters.district}
-            onChange={(e) => handleFilterChange('district', e.target.value)}
-            className="form-input"
-          >
-            <option value="">All Districts</option>
-            {districts.map(district => (
-              <option key={district} value={district}>{district}</option>
-            ))}
-          </select>
+          <div className="card p-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name, phone, or email..."
+                  value={filters.search}
+                  onChange={(e) => handleFilterChange('search', e.target.value)}
+                  className="form-input pl-10"
+                />
+              </div>
 
-          <input
-            type="text"
-            placeholder="Filter by city..."
-            value={filters.city}
-            onChange={(e) => handleFilterChange('city', e.target.value)}
-            className="form-input"
-          />
+              <select
+                value={filters.bloodType}
+                onChange={(e) => handleFilterChange('bloodType', e.target.value)}
+                className="form-input"
+              >
+                <option value="">All Blood Types</option>
+                {bloodTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
 
-          <select
-            value={filters.status}
-            onChange={(e) => handleFilterChange('status', e.target.value)}
-            className="form-input"
-          >
-            <option value="">All Status</option>
-            <option value="eligible">Eligible Now</option>
-            <option value="not-eligible">Not Eligible</option>
-          </select>
-        </div>
+              <select
+                value={filters.district}
+                onChange={(e) => handleFilterChange('district', e.target.value)}
+                className="form-input"
+              >
+                <option value="">All Districts</option>
+                {districts.map(district => (
+                  <option key={district} value={district}>{district}</option>
+                ))}
+              </select>
 
-        <div className="flex justify-between items-center">
-          <p className="text-sm text-gray-600">
-            Showing {donors.length} donors
-            {filters.search && ` for "${filters.search}"`}
-          </p>
-          <button
-            onClick={clearFilters}
-            className="btn-outline py-2 text-sm flex items-center gap-2"
-          >
-            <Filter className="w-4 h-4" />
-            Clear Filters
-          </button>
-        </div>
-      </div>
+              <input
+                type="text"
+                placeholder="Filter by city..."
+                value={filters.city}
+                onChange={(e) => handleFilterChange('city', e.target.value)}
+                className="form-input"
+              />
 
-      {donors.length === 0 ? (
-        <div className="text-center py-12">
-          <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <h3 className="text-xl font-semibold text-gray-600 mb-2">No donors found</h3>
-          <p className="text-gray-500">Try adjusting your filters to see more results.</p>
-          <button onClick={clearFilters} className="btn-primary mt-4">Clear All Filters</button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {donors.map(donor => (
-            <DonorCard
-              key={donor.id}
-              donor={donor}
-              onEdit={() => handleEditDonor(donor)}
-              onDelete={() => handleDeleteDonor(donor)}
-              deleteLoading={deleteLoading === donor.id}
-              isAdmin={isAdmin}
-              currentUserId={user?.id}
-            />
-          ))}
-        </div>
+              <select
+                value={filters.status}
+                onChange={(e) => handleFilterChange('status', e.target.value)}
+                className="form-input"
+              >
+                <option value="">All Status</option>
+                <option value="eligible">Eligible Now</option>
+                <option value="not-eligible">Not Eligible</option>
+              </select>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-gray-600">
+                Showing {donors.length} donors
+                {filters.search && ` for "${filters.search}"`}
+              </p>
+              <button
+                onClick={clearFilters}
+                className="btn-outline py-2 text-sm flex items-center gap-2"
+              >
+                <Filter className="w-4 h-4" />
+                Clear Filters
+              </button>
+            </div>
+          </div>
+
+          {donors.length === 0 ? (
+            <div className="text-center py-12">
+              <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-xl font-semibold text-gray-600 mb-2">No donors found</h3>
+              <p className="text-gray-500">Try adjusting your filters to see more results.</p>
+              <button onClick={clearFilters} className="btn-primary mt-4">Clear All Filters</button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {donors.map(donor => (
+                <DonorCard
+                  key={donor.id}
+                  donor={donor}
+                  onEdit={() => handleEditDonor(donor)}
+                  onDelete={() => handleDeleteDonor(donor)}
+                  deleteLoading={deleteLoading === donor.id}
+                  isAdmin={isAdmin}
+                  currentUserId={user?.id}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <EditModal

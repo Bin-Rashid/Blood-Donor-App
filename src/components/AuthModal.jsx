@@ -5,8 +5,9 @@ import { districts, bloodTypes } from '../utils/helpers'
 
 const AuthModal = ({ isOpen, onClose }) => {
   const [isLogin, setIsLogin] = useState(true)
+  const [isForgotPassword, setIsForgotPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const { signIn, signUp } = useAuth()
+  const { signIn, signUp, forgotPassword } = useAuth()
   
   const [loginData, setLoginData] = useState({
     email: '',
@@ -44,7 +45,7 @@ const AuthModal = ({ isOpen, onClose }) => {
   const handleRegister = async (e) => {
     e.preventDefault()
     setLoading(true)
-    
+
     try {
       await signUp(registerData.email, registerData.password, {
         name: registerData.name,
@@ -64,12 +65,27 @@ const AuthModal = ({ isOpen, onClose }) => {
     }
   }
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      await forgotPassword(loginData.email)
+      alert('Password reset email sent! Check your inbox.')
+      setIsForgotPassword(false)
+    } catch (error) {
+      alert(`Failed to send reset email: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h3 className="text-xl font-semibold text-gray-800">
-            {isLogin ? 'Sign In to Your Account' : 'Register as Blood Donor'}
+            {isForgotPassword ? 'Reset Password' : isLogin ? 'Sign In to Your Account' : 'Register as Blood Donor'}
           </h3>
           <button
             onClick={onClose}
@@ -80,7 +96,37 @@ const AuthModal = ({ isOpen, onClose }) => {
         </div>
 
         <div className="p-6">
-          {isLogin ? (
+          {isForgotPassword ? (
+            // Forgot Password Form
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div>
+                <label htmlFor="forgot-email" className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    id="forgot-email"
+                    name="email"
+                    type="email"
+                    value={loginData.email}
+                    onChange={(e) => setLoginData(prev => ({...prev, email: e.target.value}))}
+                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all"
+                    placeholder="your@email.com"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Sending...' : 'Send Reset Email'}
+              </button>
+            </form>
+          ) : isLogin ? (
             // Login Form
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
@@ -95,7 +141,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                     type="email"
                     value={loginData.email}
                     onChange={(e) => setLoginData(prev => ({...prev, email: e.target.value}))}
-                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all"
+                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all text-black"
                     placeholder="your@email.com"
                     required
                   />
@@ -114,7 +160,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                     type="password"
                     value={loginData.password}
                     onChange={(e) => setLoginData(prev => ({...prev, password: e.target.value}))}
-                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all"
+                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all text-black"
                     placeholder="Your password"
                     required
                   />
@@ -302,13 +348,31 @@ const AuthModal = ({ isOpen, onClose }) => {
             </form>
           )}
 
-          <div className="text-center mt-4">
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-red-600 hover:text-red-700 font-medium"
-            >
-              {isLogin ? "Don't have an account? Register" : 'Already have an account? Sign In'}
-            </button>
+          <div className="text-center mt-4 space-y-2">
+            {isLogin && !isForgotPassword && (
+              <button
+                onClick={() => setIsForgotPassword(true)}
+                className="text-red-600 hover:text-red-700 font-medium text-sm"
+              >
+                Forgot Password?
+              </button>
+            )}
+            {isForgotPassword && (
+              <button
+                onClick={() => setIsForgotPassword(false)}
+                className="text-red-600 hover:text-red-700 font-medium text-sm"
+              >
+                Back to Sign In
+              </button>
+            )}
+            {!isForgotPassword && (
+              <button
+                onClick={() => setIsLogin(!isLogin)}
+                className="text-red-600 hover:text-red-700 font-medium"
+              >
+                {isLogin ? "Don't have an account? Register" : 'Already have an account? Sign In'}
+              </button>
+            )}
           </div>
         </div>
       </div>
