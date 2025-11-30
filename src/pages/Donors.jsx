@@ -1,6 +1,6 @@
 // src/pages/Donors.jsx
-import React, { useState, useEffect } from 'react';
-import { Users, Filter, Download, RefreshCw, Search, Info, BookOpen } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Users, Filter, Download, RefreshCw, Search, BookOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useDonors } from '../context/DonorContext';
 import DonorCard from '../components/DonorCard';
@@ -15,26 +15,54 @@ const Donors = () => {
   const [deleteLoading, setDeleteLoading] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedDonor, setSelectedDonor] = useState(null);
-  const [activeSubTab, setActiveSubTab] = useState('guidelines');
+  const [activeSubTab, setActiveSubTab] = useState(() => {
+    const savedTab = localStorage.getItem('activeDonorsTab');
+    return savedTab || 'guidelines';
+  });
 
-  // Filters
-  const [filters, setFilters] = useState({
-    search: '',
-    bloodType: '',
-    district: '',
-    city: '',
-    status: '',
-    sortBy: 'name-asc',
+  // Filters with localStorage persistence
+  const [filters, setFilters] = useState(() => {
+    const savedFilters = localStorage.getItem('donorFilters');
+    return savedFilters ? JSON.parse(savedFilters) : {
+      search: '',
+      bloodType: '',
+      district: '',
+      city: '',
+      status: '',
+      sortBy: 'name-asc',
+    };
   });
 
   const debouncedFilters = useDebounce(filters, 300);
 
-  // Fetch donors when debounced filters change
+  // active tab localStorage এ save করা
+  useEffect(() => {
+    localStorage.setItem('activeDonorsTab', activeSubTab);
+  }, [activeSubTab]);
+
+  // Save filters to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('donorFilters', JSON.stringify(filters));
+  }, [filters]);
+
+  // fetchDonors function কে useCallback দিয়ে wrap করা
+  const handleFetchDonors = useCallback(async (currentFilters = filters, currentSortBy = filters.sortBy) => {
+    if (activeSubTab === 'find-donors') {
+      await fetchDonors(currentFilters, currentSortBy);
+    }
+  }, [activeSubTab, filters, fetchDonors]);
+
+  // শুধুমাত্র find-donors tab এ থাকলে এবং filters change হলে data fetch করা
+  useEffect(() => {
+    handleFetchDonors(debouncedFilters, debouncedFilters.sortBy);
+  }, [debouncedFilters, handleFetchDonors]);
+
+  // Tab change হলে data fetch করা
   useEffect(() => {
     if (activeSubTab === 'find-donors') {
-      fetchDonors(debouncedFilters, debouncedFilters.sortBy);
+      handleFetchDonors();
     }
-  }, [debouncedFilters, fetchDonors, activeSubTab]);
+  }, [activeSubTab, handleFetchDonors]);
 
   const handleDeleteDonor = async (donor) => {
     const canDelete = isAdmin || user?.id === donor.id;
@@ -59,7 +87,9 @@ const Donors = () => {
 
       if (error) throw error;
 
-      await fetchDonors(filters, filters.sortBy);
+      if (activeSubTab === 'find-donors') {
+        await handleFetchDonors();
+      }
       alert('Profile deleted successfully!');
     } catch (error) {
       console.error('Error deleting donor:', error);
@@ -80,7 +110,9 @@ const Donors = () => {
   };
 
   const handleUpdateDonor = () => {
-    fetchDonors(filters, filters.sortBy);
+    if (activeSubTab === 'find-donors') {
+      handleFetchDonors();
+    }
     setEditModalOpen(false);
   };
 
@@ -97,6 +129,10 @@ const Donors = () => {
       status: '',
       sortBy: 'name-asc',
     });
+  };
+
+  const handleRefreshData = () => {
+    handleFetchDonors();
   };
 
   const exportData = () => {
@@ -138,16 +174,10 @@ const Donors = () => {
     }
   };
 
-  if (loading && activeSubTab === 'find-donors') {
-    return (
-      <div className="p-6 flex justify-center items-center min-h-64">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2 text-red-600" />
-          <p className="text-gray-600">Loading donors...</p>
-        </div>
-      </div>
-    );
-  }
+  // Tab change handler
+  const handleTabChange = (tab) => {
+    setActiveSubTab(tab);
+  };
 
   return (
     <div className="p-6">
@@ -177,7 +207,7 @@ const Donors = () => {
       {/* Sub Tabs */}
       <div className="flex border-b border-gray-200 mb-6">
         <button
-          onClick={() => setActiveSubTab('guidelines')}
+          onClick={() => handleTabChange('guidelines')}
           className={`flex items-center gap-2 px-4 py-3 font-medium transition-all ${
             activeSubTab === 'guidelines'
               ? 'text-red-600 border-b-2 border-red-600'
@@ -188,7 +218,7 @@ const Donors = () => {
           গুরুত্বপূর্ণ দিকনির্দেশনা
         </button>
         <button
-          onClick={() => setActiveSubTab('find-donors')}
+          onClick={() => handleTabChange('find-donors')}
           className={`flex items-center gap-2 px-4 py-3 font-medium transition-all ${
             activeSubTab === 'find-donors'
               ? 'text-red-600 border-b-2 border-red-600'
@@ -218,7 +248,7 @@ const Donors = () => {
               Export Data ({donors.length})
             </button>
             <button
-              onClick={() => fetchDonors(filters, filters.sortBy)}
+              onClick={handleRefreshData}
               className="btn-outline py-2 flex items-center gap-2"
             >
               <RefreshCw className="w-4 h-4" />
@@ -300,6 +330,9 @@ const Donors = () => {
               <p className="text-sm text-gray-600">
                 Showing {donors.length} donors
                 {filters.search && ` for "${filters.search}"`}
+                {filters.bloodType && ` with blood type "${filters.bloodType}"`}
+                {filters.district && ` in district "${filters.district}"`}
+                {filters.status && ` with status "${filters.status}"`}
               </p>
               <button
                 onClick={clearFilters}
@@ -311,7 +344,12 @@ const Donors = () => {
             </div>
           </div>
 
-          {donors.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12">
+              <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2 text-red-600" />
+              <p className="text-gray-600">Loading donors...</p>
+            </div>
+          ) : donors.length === 0 ? (
             <div className="text-center py-12">
               <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
               <h3 className="text-xl font-semibold text-gray-600 mb-2">No donors found</h3>
