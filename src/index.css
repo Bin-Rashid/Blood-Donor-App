@@ -66,4 +66,30 @@
   .status-not-eligible {
     @apply bg-red-50 text-red-700 border-2 border-red-200 px-4 py-2 rounded-lg font-semibold flex items-center gap-2;
   }
+
+  /* src/index.css বা আপনার main CSS file এ */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Smooth transitions for all interactive elements */
+.donor-card {
+  transition: all 0.3s ease-in-out;
+}
+
+.donor-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
 }

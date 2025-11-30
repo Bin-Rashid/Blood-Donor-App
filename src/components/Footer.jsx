@@ -29,9 +29,9 @@ const Footer = ({ whatsappNumber, onEditWhatsApp, instructions }) => {
         {/* Instructions Section - UPDATED */}
         <div className="px-6 py-8 text-center border-b border-white/20">
           <div className="max-w-4xl mx-auto">
-            <h3 className="text-2xl font-bold mb-4 flex items-center justify-center gap-3 bangla">
+            <h3 className="text-2xl font-bold mb-4 flex items-center justify-center gap-3">
               <Heart className="w-6 h-6" fill="white" />
-              জীবন বাঁচাতে রক্তদান করুন
+              Connecting blood donors with those in need.
             </h3>
             
             {/* Updated Guidelines Section */}
