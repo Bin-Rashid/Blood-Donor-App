@@ -145,6 +145,12 @@ const GuidelinesTab = () => {
 
   return (
     <div className="space-y-8">
+      {/* হেডিং যোগ করা হয়েছে এখানে */}
+      <div className=" p-6">
+        <h1 className="text-3xl font-bold text-center mb-2 bangla">রক্তদান নির্দেশিকা ও ইসলামিক দৃষ্টিভঙ্গি</h1>
+        <p className="text-gray-600 text-center mb-8 bangla">মানবতার সেবায় রক্তদান - ইসলামিক দৃষ্টিকোণ</p>
+      </div>
+
       {/* Admin Controls */}
       {isAdmin && (
         <div className="flex justify-end gap-4 mb-6">
@@ -218,7 +224,7 @@ const GuidelinesTab = () => {
                   ) : (
                     <>
                       <h3 className="font-semibold text-gray-800 bangla">{guideline.title}</h3>
-                      <p className="text-gray-600 text-sm mt-1 bangla">{guideline.description}</p>
+                      <p className="text-gray-600 text-sm mt-2 bangla">{guideline.description}</p>
                     </>
                   )}
                 </div>
