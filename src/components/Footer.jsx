@@ -7,7 +7,7 @@ const Footer = ({ whatsappNumber, onEditWhatsApp, instructions }) => {
   const { isAdmin } = useAuth();
 
   const handleWhatsAppClick = () => {
-    if (whatsappNumber && whatsappNumber !== '+880XXXXXXXXX') {
+    if (whatsappNumber && whatsappNumber !== '+8801959601901') {
       const message = "Hello, I need information about blood donation..."
       const url = `https://wa.me/${whatsappNumber.replace('+', '')}?text=${encodeURIComponent(message)}`
       window.open(url, '_blank')

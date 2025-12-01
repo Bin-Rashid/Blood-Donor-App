@@ -1,11 +1,12 @@
 // src/pages/Donors.jsx
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Users, Filter, Download, RefreshCw, Search, BookOpen } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { useAuth } from '../context/AuthContext'
 import DonorCard from '../components/DonorCard'
 import StatsCards from '../components/StatsCards'
 import EditModal from '../components/EditModal'
+import PhoneRequestModal from '../components/PhoneRequestModal'
 import GuidelinesTab from '../components/GuidelinesTab'
 import { districts, bloodTypes } from '../utils/helpers'
 
@@ -16,12 +17,20 @@ const Donors = () => {
   const [loading, setLoading] = useState(true)
   const [deleteLoading, setDeleteLoading] = useState(null)
   const [editModalOpen, setEditModalOpen] = useState(false)
+  const [phoneRequestModalOpen, setPhoneRequestModalOpen] = useState(false)
   const [selectedDonor, setSelectedDonor] = useState(null)
+  const [phoneRequestDonor, setPhoneRequestDonor] = useState(null)
   const [stats, setStats] = useState({
     totalDonors: 0,
     eligibleDonors: 0,
     universalDonors: 0,
     recentDonors: 0
+  })
+
+  // Track which donors' phone numbers are visible
+  const [visiblePhones, setVisiblePhones] = useState(() => {
+    const saved = localStorage.getItem('visiblePhoneDonors')
+    return saved ? JSON.parse(saved) : {}
   })
 
   const [activeSubTab, setActiveSubTab] = useState(() => {
@@ -45,6 +54,11 @@ const Donors = () => {
   useEffect(() => {
     localStorage.setItem('activeDonorsTab', activeSubTab)
   }, [activeSubTab])
+
+  // Save visible phones to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('visiblePhoneDonors', JSON.stringify(visiblePhones))
+  }, [visiblePhones])
 
   useEffect(() => {
     if (!hasFetched.current && activeSubTab === 'find-donors') {
@@ -158,6 +172,13 @@ const Donors = () => {
       // Success - remove from local state (for admin deleting other profiles)
       setDonors(prev => prev.filter(d => d.id !== donor.id))
       
+      // Also remove from visible phones
+      setVisiblePhones(prev => {
+        const newVisible = { ...prev }
+        delete newVisible[donor.id]
+        return newVisible
+      })
+      
       alert('Profile deleted successfully!')
       
     } catch (error) {
@@ -190,6 +211,59 @@ const Donors = () => {
   const handleUpdateDonor = () => {
     if (activeSubTab === 'find-donors') {
       fetchDonors()
+    }
+  }
+
+  // Phone number request handler
+  const handleRequestPhone = (donor) => {
+    setPhoneRequestDonor(donor)
+    setPhoneRequestModalOpen(true)
+  }
+
+  // Handle phone request submission
+  const handlePhoneRequestSubmit = async (requesterInfo) => {
+    if (!phoneRequestDonor) return;
+
+    // Send to WhatsApp
+    const whatsappMessage = encodeURIComponent(
+      `📞 *New Phone Number Request*\n\n` +
+      `*Donor Info:*\n` +
+      `Name: ${phoneRequestDonor.name}\n` +
+      `Blood Type: ${phoneRequestDonor.blood_type || 'Unknown'}\n` +
+      `Location: ${phoneRequestDonor.district || ''}${phoneRequestDonor.city ? ', ' + phoneRequestDonor.city : ''}\n\n` +
+      `*Requester Info:*\n` +
+      `Name: ${requesterInfo.name}\n` +
+      `Phone: ${requesterInfo.phone}\n` +
+      `Address: ${requesterInfo.address}\n` +
+      `Patient Problem: ${requesterInfo.patientProblem}\n\n` +
+      `*Donor Phone:* ${phoneRequestDonor.phone}\n` +
+      `---\n` +
+      `Requested at: ${new Date().toLocaleString()}`
+    );
+    
+    // Use your WhatsApp number here
+    const whatsappNumber = "+8801994984210"; // Replace with your actual WhatsApp number
+    
+    window.open(`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`, '_blank');
+    
+    // Mark this donor's phone as visible
+    setVisiblePhones(prev => ({
+      ...prev,
+      [phoneRequestDonor.id]: {
+        phone: phoneRequestDonor.phone,
+        revealedAt: new Date().toISOString()
+      }
+    }));
+    
+    setPhoneRequestModalOpen(false)
+    setPhoneRequestDonor(null)
+  }
+
+  // Clear visible phones (admin function)
+  const clearVisiblePhones = () => {
+    if (window.confirm('Are you sure you want to clear all revealed phone numbers? This will hide all previously revealed phone numbers.')) {
+      setVisiblePhones({})
+      alert('All phone numbers have been hidden again.')
     }
   }
 
@@ -371,7 +445,33 @@ const Donors = () => {
             <Download className="w-4 h-4" />
             Export Data ({donors.length})
           </button>
+          {isAdmin && (
+            <button
+              onClick={clearVisiblePhones}
+              className="btn-outline py-2 flex items-center gap-2 bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100"
+            >
+              🔒 Hide All Phones
+            </button>
+          )}
         </div>
+
+        {/* Stats about revealed phones */}
+        {Object.keys(visiblePhones).length > 0 && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-green-700">
+                <span className="font-semibold">📱 {Object.keys(visiblePhones).length} phone numbers are visible</span>
+                <p className="text-xs mt-1">Phone numbers you've requested will remain visible</p>
+              </div>
+              <button
+                onClick={() => setVisiblePhones({})}
+                className="text-xs text-green-600 hover:text-green-800 underline"
+              >
+                Hide all
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Sort Controls */}
         <div className="flex items-center gap-4 mb-6">
@@ -488,9 +588,11 @@ const Donors = () => {
                 donor={donor}
                 onEdit={() => handleEditDonor(donor)}
                 onDelete={() => handleDeleteDonor(donor)}
+                onRequestPhone={() => handleRequestPhone(donor)}
                 deleteLoading={deleteLoading === donor.id}
                 isAdmin={isAdmin}
                 currentUserId={user?.id}
+                isPhoneVisible={!!visiblePhones[donor.id]} // New prop
               />
             ))}
           </div>
@@ -563,6 +665,20 @@ const Donors = () => {
         onClose={() => setEditModalOpen(false)}
         donor={selectedDonor}
         onUpdate={handleUpdateDonor}
+      />
+
+      {/* Phone Request Modal */}
+      <PhoneRequestModal
+        isOpen={phoneRequestModalOpen}
+        onClose={() => {
+          setPhoneRequestModalOpen(false)
+          setPhoneRequestDonor(null)
+        }}
+        onSubmit={handlePhoneRequestSubmit}
+        donorName={phoneRequestDonor?.name || ''}
+        donorBloodType={phoneRequestDonor?.blood_type || ''}
+        donorLocation={`${phoneRequestDonor?.district || ''}${phoneRequestDonor?.city ? ', ' + phoneRequestDonor.city : ''}`}
+        donorPhone={phoneRequestDonor?.phone || ''}
       />
     </div>
   )

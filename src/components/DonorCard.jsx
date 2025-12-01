@@ -1,8 +1,8 @@
 // src/components/DonorCard.jsx
 import React from 'react';
-import { User, Phone, MapPin, Calendar, Droplets, Edit, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { User, Phone, MapPin, Calendar, Droplets, Edit, Trash2, CheckCircle, XCircle, AlertCircle, MessageCircle, Eye, EyeOff } from 'lucide-react';
 
-const DonorCard = ({ donor, onEdit, onDelete, deleteLoading, isAdmin, currentUserId }) => {
+const DonorCard = ({ donor, onEdit, onDelete, deleteLoading, isAdmin, currentUserId, onRequestPhone, isPhoneVisible }) => {
   const canEdit = isAdmin || currentUserId === donor.id;
   const canDelete = isAdmin || currentUserId === donor.id;
 
@@ -28,10 +28,75 @@ const DonorCard = ({ donor, onEdit, onDelete, deleteLoading, isAdmin, currentUse
 
   const eligibility = calculateEligibility();
 
-  const handlePhoneClick = () => {
-    if (donor.phone) {
-      window.open(`tel:${donor.phone}`);
+  // Format phone number with partial blur or show full
+  const formatPhoneNumber = (phone) => {
+    if (!phone) return 'Not provided';
+    
+    if (eligibility.status === 'not-eligible') {
+      // Show disabled message for not eligible donors
+      return (
+        <span className="text-red-500 text-sm">
+          <AlertCircle className="w-4 h-4 inline mr-1" />
+          Not eligible yet
+        </span>
+      );
     }
+    
+    // If phone is already visible (requested before)
+    if (isPhoneVisible) {
+      return (
+        <span className="text-green-700 font-semibold flex items-center gap-2">
+          <Eye className="w-4 h-4 text-green-600" />
+          {phone}
+          <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+            Visible
+          </span>
+        </span>
+      );
+    }
+    
+    // Show blurred phone number for eligible donors (not requested yet)
+    const visibleDigits = 4;
+    const phoneStr = phone.toString();
+    
+    if (phoneStr.length <= visibleDigits) {
+      return phoneStr;
+    }
+    
+    const visiblePart = phoneStr.slice(-visibleDigits);
+    const hiddenPart = phoneStr.slice(0, -visibleDigits).replace(/./g, '•');
+    
+    return (
+      <span className="text-gray-700">
+        {hiddenPart}
+        <span className="text-red-600 font-semibold">{visiblePart}</span>
+      </span>
+    );
+  };
+
+  const handlePhoneClick = (e) => {
+    e.preventDefault();
+    
+    if (eligibility.status === 'not-eligible') {
+      alert('This donor is not eligible for donation yet. Please wait until 3 months have passed since their last donation.');
+      return;
+    }
+    
+    if (!donor.phone) {
+      alert('Phone number not available');
+      return;
+    }
+    
+    // If phone is already visible, just show it or call
+    if (isPhoneVisible) {
+      if (window.confirm(`Call ${donor.phone}?`)) {
+        window.open(`tel:${donor.phone}`, '_blank');
+      }
+      return;
+    }
+    
+    // Call parent function to show modal (for requesting phone)
+    onRequestPhone(donor);
   };
 
   const formatDate = (dateString) => {
@@ -46,8 +111,16 @@ const DonorCard = ({ donor, onEdit, onDelete, deleteLoading, isAdmin, currentUse
 
   return (
     <div className="donor-card relative overflow-hidden group">
+      {/* Phone Visibility Badge */}
+      {isPhoneVisible && (
+        <div className="absolute top-2 left-4 z-10 bg-green-100 text-green-700 px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-lg">
+          <Eye className="w-3.5 h-3.5" />
+          <span>Phone Visible</span>
+        </div>
+      )}
+
       {/* Eligibility Status Badge - Top Right Corner */}
-      <div className={`absolute top-2 right-4 z-10 ${
+      <div className={`absolute top-2 ${isPhoneVisible ? 'right-20' : 'right-4'} z-10 ${
         eligibility.status === 'eligible' 
           ? 'bg-green-500 text-white' 
           : 'bg-red-500 text-white'
@@ -70,6 +143,10 @@ const DonorCard = ({ donor, onEdit, onDelete, deleteLoading, isAdmin, currentUse
         <div className="absolute top-12 right-4 bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 shadow-lg">
           <div className="font-semibold">Next donation in:</div>
           <div>{eligibility.daysLeft} days</div>
+          <div className="text-xs mt-1 text-red-600">
+            <AlertCircle className="w-3 h-3 inline mr-1" />
+            Phone number hidden
+          </div>
         </div>
       )}
 
@@ -111,10 +188,35 @@ const DonorCard = ({ donor, onEdit, onDelete, deleteLoading, isAdmin, currentUse
           <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
           <button
             onClick={handlePhoneClick}
-            className="text-gray-700 hover:text-red-600 transition-colors text-sm font-medium truncate flex-1 text-left"
-            title="Click to call"
+            className={`text-sm font-medium truncate flex-1 text-left transition-colors ${
+              eligibility.status === 'eligible' 
+                ? isPhoneVisible
+                  ? 'text-green-700 hover:text-green-800 cursor-pointer'
+                  : 'text-gray-700 hover:text-red-600 cursor-pointer'
+                : 'text-red-500 cursor-not-allowed'
+            }`}
+            disabled={eligibility.status === 'not-eligible'}
+            title={
+              isPhoneVisible 
+                ? 'Click to call' 
+                : eligibility.status === 'eligible' 
+                  ? 'Click to request phone number' 
+                  : 'Not eligible for donation yet'
+            }
           >
-            {donor.phone || 'Not provided'}
+            {formatPhoneNumber(donor.phone)}
+            {eligibility.status === 'eligible' && donor.phone && !isPhoneVisible && (
+              <span className="text-xs text-red-500 ml-2 flex items-center gap-1">
+                <MessageCircle className="w-3 h-3" />
+                Click to request
+              </span>
+            )}
+            {isPhoneVisible && (
+              <span className="text-xs text-green-600 ml-2 flex items-center gap-1">
+                <Eye className="w-3 h-3" />
+                Click to call
+              </span>
+            )}
           </button>
         </div>
         
@@ -148,6 +250,20 @@ const DonorCard = ({ donor, onEdit, onDelete, deleteLoading, isAdmin, currentUse
               className="bg-red-500 h-2 rounded-full transition-all duration-500 ease-out"
               style={{ width: `${((90 - eligibility.daysLeft) / 90) * 100}%` }}
             ></div>
+          </div>
+          <div className="text-xs text-red-500 mt-1 flex items-center gap-1">
+            <AlertCircle className="w-3 h-3" />
+            Phone number will be available after {eligibility.daysLeft} days
+          </div>
+        </div>
+      )}
+
+      {/* Phone Visibility Note */}
+      {isPhoneVisible && eligibility.status === 'eligible' && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center gap-2 text-sm text-green-700">
+            <Eye className="w-4 h-4" />
+            <span>Phone number is visible because you requested it previously</span>
           </div>
         </div>
       )}
@@ -184,14 +300,18 @@ const DonorCard = ({ donor, onEdit, onDelete, deleteLoading, isAdmin, currentUse
       {/* Background Pattern based on Eligibility */}
       <div className={`absolute inset-0 opacity-5 pointer-events-none ${
         eligibility.status === 'eligible' 
-          ? 'bg-gradient-to-br from-green-400 to-green-600' 
+          ? isPhoneVisible
+            ? 'bg-gradient-to-br from-green-400 to-green-600'
+            : 'bg-gradient-to-br from-green-400 to-green-600'
           : 'bg-gradient-to-br from-red-400 to-red-600'
       }`}></div>
 
       {/* Hover Effect Border */}
       <div className={`absolute inset-0 rounded-xl border-2 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none ${
         eligibility.status === 'eligible' 
-          ? 'border-green-200' 
+          ? isPhoneVisible
+            ? 'border-green-200'
+            : 'border-green-200'
           : 'border-red-200'
       }`}></div>
     </div>
