@@ -1,6 +1,6 @@
 // src/pages/Donors.jsx
 import React, { useState, useEffect, useRef } from 'react'
-import { Users, Filter, Download, RefreshCw, Search, BookOpen } from 'lucide-react'
+import { Users, Filter, Download, RefreshCw, Search, BookOpen, ChevronDown } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { useAuth } from '../context/AuthContext'
 import DonorCard from '../components/DonorCard'
@@ -14,7 +14,9 @@ const Donors = () => {
   const { isAdmin, user, signOut } = useAuth()
   const [donors, setDonors] = useState([])
   const [filteredDonors, setFilteredDonors] = useState([])
+  const [displayedDonors, setDisplayedDonors] = useState([]) // New state for pagination
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false) // New loading state for load more
   const [deleteLoading, setDeleteLoading] = useState(null)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [phoneRequestModalOpen, setPhoneRequestModalOpen] = useState(false)
@@ -26,6 +28,11 @@ const Donors = () => {
     universalDonors: 0,
     recentDonors: 0
   })
+
+  // Pagination settings
+  const [pageSize, setPageSize] = useState(20) // Items per page
+  const [currentPage, setCurrentPage] = useState(1) // Current page number
+  const [totalPages, setTotalPages] = useState(1) // Total pages
 
   // Track which donors' phone numbers are visible
   const [visiblePhones, setVisiblePhones] = useState(() => {
@@ -59,6 +66,13 @@ const Donors = () => {
   useEffect(() => {
     localStorage.setItem('visiblePhoneDonors', JSON.stringify(visiblePhones))
   }, [visiblePhones])
+
+  // Update displayed donors when filtered donors or page changes
+  useEffect(() => {
+    if (activeSubTab === 'find-donors') {
+      updateDisplayedDonors()
+    }
+  }, [filteredDonors, currentPage, activeSubTab])
 
   useEffect(() => {
     if (!hasFetched.current && activeSubTab === 'find-donors') {
@@ -333,11 +347,53 @@ const Donors = () => {
       })
 
       setFilteredDonors(filtered)
+      
+      // Reset to first page when filters change
+      setCurrentPage(1)
+      
       console.log('🔍 Filtered donors:', filtered.length)
     } catch (error) {
       console.error('Error in filterAndSortDonors:', error)
       setFilteredDonors(donors)
     }
+  }
+
+  // Update displayed donors based on current page
+  const updateDisplayedDonors = () => {
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    const donorsToDisplay = filteredDonors.slice(0, endIndex)
+    
+    setDisplayedDonors(donorsToDisplay)
+    
+    // Calculate total pages
+    const calculatedTotalPages = Math.ceil(filteredDonors.length / pageSize)
+    setTotalPages(calculatedTotalPages)
+  }
+
+  // Load more donors
+  const loadMoreDonors = () => {
+    if (currentPage < totalPages) {
+      setLoadingMore(true)
+      
+      // Simulate loading delay
+      setTimeout(() => {
+        setCurrentPage(prev => prev + 1)
+        setLoadingMore(false)
+      }, 500)
+    }
+  }
+
+  // Load all donors at once
+  const loadAllDonors = () => {
+    setLoadingMore(true)
+    
+    // Simulate loading delay
+    setTimeout(() => {
+      const allPages = Math.ceil(filteredDonors.length / pageSize)
+      setCurrentPage(allPages)
+      setLoadingMore(false)
+    }, 800)
   }
 
   const handleFilterChange = (key, value) => {
@@ -423,6 +479,9 @@ const Donors = () => {
       )
     }
 
+    const hasMoreDonors = displayedDonors.length < filteredDonors.length
+    const remainingDonors = filteredDonors.length - displayedDonors.length
+
     return (
       <>
         {/* Statistics */}
@@ -473,21 +532,32 @@ const Donors = () => {
           </div>
         )}
 
-        {/* Sort Controls */}
-        <div className="flex items-center gap-4 mb-6">
-          <span className="text-sm font-medium text-gray-700">Sort by:</span>
-          <select
-            value={filters.sortBy}
-            onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-            className="form-input w-auto"
-          >
-            <option value="name-asc">Name (A-Z)</option>
-            <option value="name-desc">Name (Z-A)</option>
-            <option value="age-asc">Age (Low to High)</option>
-            <option value="age-desc">Age (High to Low)</option>
-            <option value="created_at-asc">Registration Date (Oldest)</option>
-            <option value="created_at-desc">Registration Date (Newest)</option>
-          </select>
+        {/* Pagination Info */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-medium text-gray-700">Sort by:</span>
+            <select
+              value={filters.sortBy}
+              onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+              className="form-input w-auto"
+            >
+              <option value="name-asc">Name (A-Z)</option>
+              <option value="name-desc">Name (Z-A)</option>
+              <option value="age-asc">Age (Low to High)</option>
+              <option value="age-desc">Age (High to Low)</option>
+              <option value="created_at-asc">Registration Date (Oldest)</option>
+              <option value="created_at-desc">Registration Date (Newest)</option>
+            </select>
+          </div>
+          
+          <div className="text-sm text-gray-600">
+            Showing {displayedDonors.length} of {filteredDonors.length} donors
+            {hasMoreDonors && (
+              <span className="text-red-600 font-medium ml-2">
+                ({remainingDonors} more available)
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Search and Filters */}
@@ -547,11 +617,11 @@ const Donors = () => {
 
           <div className="flex justify-between items-center">
             <p className="text-sm text-gray-600">
-              Showing {filteredDonors.length} of {donors.length} donors
-              {filters.search && ` for "${filters.search}"`}
+              {filters.search && `Search results for "${filters.search}"`}
               {filters.bloodType && ` with blood type "${filters.bloodType}"`}
               {filters.district && ` in district "${filters.district}"`}
               {filters.status && ` with status "${filters.status}"`}
+              {!filters.search && !filters.bloodType && !filters.district && !filters.status && 'All donors'}
             </p>
             <button
               onClick={clearFilters}
@@ -564,7 +634,7 @@ const Donors = () => {
         </div>
 
         {/* Donors Grid */}
-        {filteredDonors.length === 0 ? (
+        {displayedDonors.length === 0 ? (
           <div className="text-center py-12">
             <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
             <h3 className="text-xl font-semibold text-gray-600 mb-2">No donors found</h3>
@@ -581,21 +651,83 @@ const Donors = () => {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredDonors.map(donor => (
-              <DonorCard
-                key={donor.id}
-                donor={donor}
-                onEdit={() => handleEditDonor(donor)}
-                onDelete={() => handleDeleteDonor(donor)}
-                onRequestPhone={() => handleRequestPhone(donor)}
-                deleteLoading={deleteLoading === donor.id}
-                isAdmin={isAdmin}
-                currentUserId={user?.id}
-                isPhoneVisible={!!visiblePhones[donor.id]} // New prop
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {displayedDonors.map(donor => (
+                <DonorCard
+                  key={donor.id}
+                  donor={donor}
+                  onEdit={() => handleEditDonor(donor)}
+                  onDelete={() => handleDeleteDonor(donor)}
+                  onRequestPhone={() => handleRequestPhone(donor)}
+                  deleteLoading={deleteLoading === donor.id}
+                  isAdmin={isAdmin}
+                  currentUserId={user?.id}
+                  isPhoneVisible={!!visiblePhones[donor.id]}
+                />
+              ))}
+            </div>
+
+            {/* Load More Section */}
+            {hasMoreDonors && (
+              <div className="mt-10 text-center space-y-4">
+                <div className="text-gray-600 text-sm">
+                  Showing {displayedDonors.length} of {filteredDonors.length} donors
+                  <span className="text-red-600 font-medium ml-2">
+                    ({remainingDonors} more to load)
+                  </span>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <button
+                    onClick={loadMoreDonors}
+                    disabled={loadingMore}
+                    className="btn-primary flex items-center justify-center gap-2 min-w-[200px]"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-4 h-4" />
+                        Load More ({Math.min(pageSize, remainingDonors)} more)
+                      </>
+                    )}
+                  </button>
+                  
+                  {remainingDonors > pageSize && (
+                    <button
+                      onClick={loadAllDonors}
+                      disabled={loadingMore}
+                      className="btn-outline flex items-center justify-center gap-2 min-w-[200px]"
+                    >
+                      Load All {remainingDonors} Donors
+                    </button>
+                  )}
+                </div>
+                
+                <div className="text-xs text-gray-500">
+                  Currently showing page {currentPage} of {totalPages}
+                </div>
+              </div>
+            )}
+
+            {/* Show message when all donors are loaded */}
+            {!hasMoreDonors && filteredDonors.length > 0 && (
+              <div className="mt-10 text-center">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 inline-block">
+                  <p className="text-green-700 font-medium">
+                    🎉 All {filteredDonors.length} donors are displayed
+                  </p>
+                  <p className="text-green-600 text-sm mt-1">
+                    You've reached the end of the list
+                  </p>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </>
     )
