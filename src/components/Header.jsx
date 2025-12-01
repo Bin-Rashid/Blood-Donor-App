@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Heart, User, LogIn, UserPlus, Shield, LogOut, Edit, Users } from 'lucide-react'
+import { Heart,Droplet, User, LogIn, UserPlus, Shield, LogOut, Edit, Users } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import AuthModal from './AuthModal'
@@ -43,8 +43,8 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
         {/* Top Bar */}
         <div className="px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <Heart className="w-8 h-8" fill="white" />
-            <h1 className="text-2xl font-bold">LifeShare</h1>
+            <Droplet className="w-8 h-8" fill="white" />
+            <h1 className="text-2xl font-bold">LifeShare @ Sadaqah</h1>
           </div>
 
           <div className="flex items-center gap-4">

@@ -1,51 +1,41 @@
-import React from 'react';
-import { Users, CheckCircle, Droplets, Activity } from 'lucide-react';
+import React from 'react'
+import { Users, CheckCircle, Droplets, Activity } from 'lucide-react'
 
-const StatsCards = ({ donors }) => {
-  const totalDonors = donors.length;
-
-  const eligibleDonors = donors.filter(donor => {
-    if (!donor.last_donation_date) return true;
-    const lastDonation = new Date(donor.last_donation_date);
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-    return lastDonation <= threeMonthsAgo;
-  }).length;
-
-  const universalDonors = donors.filter(donor => donor.blood_type === 'O-').length;
-
-  const oneWeekAgo = new Date();
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-  const recentDonors = donors.filter(donor =>
-    new Date(donor.created_at) >= oneWeekAgo
-  ).length;
+const StatsCards = ({ stats = {} }) => {
+  // Default values if stats is undefined or null
+  const safeStats = {
+    totalDonors: stats?.totalDonors || 0,
+    eligibleDonors: stats?.eligibleDonors || 0,
+    universalDonors: stats?.universalDonors || 0,
+    recentDonors: stats?.recentDonors || 0
+  }
 
   const statItems = [
     {
       icon: Users,
-      value: totalDonors,
+      value: safeStats.totalDonors,
       label: 'Total Donors',
-      color: 'text-blue-600',
+      color: 'text-blue-600'
     },
     {
       icon: CheckCircle,
-      value: eligibleDonors,
+      value: safeStats.eligibleDonors,
       label: 'Eligible Now',
-      color: 'text-green-600',
+      color: 'text-green-600'
     },
     {
       icon: Droplets,
-      value: universalDonors,
+      value: safeStats.universalDonors,
       label: 'O- Donors',
-      color: 'text-red-600',
+      color: 'text-red-600'
     },
     {
       icon: Activity,
-      value: recentDonors,
+      value: safeStats.recentDonors,
       label: 'Active This Week',
-      color: 'text-purple-600',
-    },
-  ];
+      color: 'text-purple-600'
+    }
+  ]
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -63,7 +53,7 @@ const StatsCards = ({ donors }) => {
         </div>
       ))}
     </div>
-  );
-};
+  )
+}
 
-export default StatsCards;
+export default StatsCards

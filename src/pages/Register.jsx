@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { User, Phone, Cake, Droplets, MapPin, Home, Calendar, Camera } from 'lucide-react';
+import { User, Phone, Cake, Droplets, MapPin, Home, Calendar, Camera, Loader } from 'lucide-react';
 import { districts, bloodTypes } from '../utils/helpers';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
-import { useDonors } from '../context/DonorContext';
 
 const Register = () => {
   const { signUp } = useAuth();
-  const { refetchDonors } = useDonors();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -21,6 +19,8 @@ const Register = () => {
     last_donation_date: '',
   });
   const [profilePicture, setProfilePicture] = useState(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -28,6 +28,8 @@ const Register = () => {
       ...prev,
       [name]: value,
     }));
+    // Clear error when user types
+    if (error) setError('');
   };
 
   const handleProfilePictureChange = (e) => {
@@ -35,52 +37,104 @@ const Register = () => {
     setProfilePicture(file);
   };
 
+  const validateForm = () => {
+    // Check all required fields
+    const requiredFields = ['name', 'email', 'password', 'phone', 'age', 'district', 'city', 'last_donation_date'];
+    const missingFields = requiredFields.filter(field => !formData[field].trim());
+    
+    if (missingFields.length > 0) {
+      setError(`Please fill all required fields: ${missingFields.join(', ')}`);
+      return false;
+    }
+
+    // Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+
+    // Validate password length
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return false;
+    }
+
+    // Validate phone (Bangladeshi format)
+    const phoneRegex = /^01[3-9]\d{8}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      setError('Please enter a valid Bangladeshi phone number (e.g., 017XXXXXXXX)');
+      return false;
+    }
+
+    // Validate age
+    const age = parseInt(formData.age);
+    if (age < 18 || age > 65) {
+      setError('Age must be between 18 and 65 years');
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
+    setSuccess('');
 
     try {
-      // Basic validation
-      if (!formData.name || !formData.email || !formData.password || !formData.phone || 
-          !formData.age || !formData.district || !formData.city || !formData.last_donation_date) {
-        throw new Error('Please fill all required fields');
+      // Validate form
+      if (!validateForm()) {
+        setLoading(false);
+        return;
       }
 
       let profilePictureUrl = null;
 
       // Upload profile picture if selected
       if (profilePicture) {
-        const fileExt = profilePicture.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('profile-pictures')
-          .upload(fileName, profilePicture);
+        try {
+          const fileExt = profilePicture.name.split('.').pop();
+          const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('profile-pictures')
+            .upload(fileName, profilePicture);
 
-        if (uploadError) throw uploadError;
+          if (uploadError) throw uploadError;
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('profile-pictures')
-          .getPublicUrl(fileName);
+          const { data: { publicUrl } } = supabase.storage
+            .from('profile-pictures')
+            .getPublicUrl(fileName);
 
-        profilePictureUrl = publicUrl;
+          profilePictureUrl = publicUrl;
+        } catch (uploadError) {
+          console.warn('Profile picture upload failed:', uploadError);
+          // Continue without profile picture
+        }
       }
 
-      // Create user account and donor profile
-      await signUp(formData.email, formData.password, {
-        name: formData.name,
-        phone: formData.phone,
+      // Prepare donor data
+      const donorData = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
         age: parseInt(formData.age),
-        blood_type: formData.blood_type,
+        blood_type: formData.blood_type || null,
         district: formData.district,
-        city: formData.city,
-        last_donation_date: formData.last_donation_date,
+        city: formData.city.trim(),
+        last_donation_date: formData.last_donation_date || null,
         profile_picture: profilePictureUrl,
         created_at: new Date().toISOString(),
-      });
+      };
 
-      alert('Registration successful! You can now sign in.');
-      refetchDonors();
+      console.log('Starting registration process...');
+      
+      // Create user account and donor profile
+      await signUp(formData.email, formData.password, donorData);
+
+      setSuccess('Registration successful! You are now logged in.');
       
       // Reset form
       setFormData({
@@ -98,7 +152,7 @@ const Register = () => {
 
     } catch (error) {
       console.error('Registration error:', error);
-      alert(`Registration failed: ${error.message}`);
+      setError(`Registration failed: ${error.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -114,16 +168,32 @@ const Register = () => {
         * Required fields: Name, Email, Password, Phone, Age, District, City/Area and Last Donation Date
       </p>
 
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-800 font-medium">Error</p>
+          <p className="text-red-600 text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* Success Message */}
+      {success && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-green-800 font-medium">Success!</p>
+          <p className="text-green-600 text-sm">{success}</p>
+        </div>
+      )}
+
       <div className="card p-8">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Profile Picture Upload */}
           <div className="flex flex-col items-center gap-4 mb-6">
-            <div className="w-24 h-24 rounded-full bg-gray-200 border-4 border-red-100 flex items-center justify-center text-gray-500 text-2xl font-bold">
+            <div className="w-24 h-24 rounded-full bg-gray-200 border-4 border-red-100 flex items-center justify-center text-gray-500 text-2xl font-bold overflow-hidden">
               {profilePicture ? (
                 <img
                   src={URL.createObjectURL(profilePicture)}
                   alt="Preview"
-                  className="w-full h-full rounded-full object-cover"
+                  className="w-full h-full object-cover"
                 />
               ) : (
                 <Camera className="w-8 h-8" />
@@ -135,10 +205,11 @@ const Register = () => {
                 accept="image/*"
                 onChange={handleProfilePictureChange}
                 className="hidden"
+                disabled={loading}
               />
-              <span className="btn-outline py-2 px-4 text-sm">
+              <span className="btn-outline py-2 px-4 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                 <Camera className="w-4 h-4" />
-                Add Profile Picture
+                Add Profile Picture (Optional)
               </span>
             </label>
           </div>
@@ -158,6 +229,7 @@ const Register = () => {
               className="form-input"
               placeholder="Enter your full name"
               required
+              disabled={loading}
             />
           </div>
 
@@ -176,6 +248,7 @@ const Register = () => {
                 className="form-input"
                 placeholder="your@email.com"
                 required
+                disabled={loading}
               />
             </div>
             <div>
@@ -189,9 +262,10 @@ const Register = () => {
                 value={formData.password}
                 onChange={handleInputChange}
                 className="form-input"
-                placeholder="Create a password"
+                placeholder="Create a password (min 6 characters)"
                 required
                 minLength={6}
+                disabled={loading}
               />
             </div>
           </div>
@@ -210,9 +284,11 @@ const Register = () => {
                 value={formData.phone}
                 onChange={handleInputChange}
                 className="form-input"
-                placeholder="01XXX-XXXXXX"
+                placeholder="017XXXXXXXX"
                 required
+                disabled={loading}
               />
+              <p className="text-xs text-gray-500 mt-1">Format: 017XXXXXXXX</p>
             </div>
             <div>
               <label htmlFor="register-age" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
@@ -226,10 +302,11 @@ const Register = () => {
                 value={formData.age}
                 onChange={handleInputChange}
                 className="form-input"
-                placeholder="Your age"
+                placeholder="Your age (18-65)"
                 min="18"
                 max="65"
                 required
+                disabled={loading}
               />
             </div>
           </div>
@@ -239,7 +316,7 @@ const Register = () => {
             <div>
               <label htmlFor="register-blood-type" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <Droplets className="w-4 h-4" />
-                Blood Type
+                Blood Type (Optional)
               </label>
               <select
                 id="register-blood-type"
@@ -247,6 +324,7 @@ const Register = () => {
                 value={formData.blood_type}
                 onChange={handleInputChange}
                 className="form-input"
+                disabled={loading}
               >
                 <option value="">Select Blood Type</option>
                 {bloodTypes.map(type => (
@@ -266,6 +344,7 @@ const Register = () => {
                 onChange={handleInputChange}
                 className="form-input"
                 required
+                disabled={loading}
               >
                 <option value="">Select District</option>
                 {districts.map(district => (
@@ -290,6 +369,7 @@ const Register = () => {
               className="form-input"
               placeholder="Your city or area"
               required
+              disabled={loading}
             />
           </div>
 
@@ -307,7 +387,12 @@ const Register = () => {
               onChange={handleInputChange}
               className="form-input"
               required
+              disabled={loading}
+              max={new Date().toISOString().split('T')[0]}
             />
+            <p className="text-xs text-gray-500 mt-1">
+              If you've never donated before, please select today's date or a future date
+            </p>
           </div>
 
           {/* Terms and Conditions */}
@@ -317,6 +402,7 @@ const Register = () => {
               id="terms"
               required
               className="mt-1"
+              disabled={loading}
             />
             <label htmlFor="terms" className="text-sm text-gray-600">
               I agree to the terms and conditions and confirm that I meet the eligibility criteria for blood donation.
@@ -324,7 +410,7 @@ const Register = () => {
           </div>
 
           {/* Submit Button */}
-          <div className="text-center">
+          <div className="text-center pt-4">
             <button
               type="submit"
               disabled={loading}
