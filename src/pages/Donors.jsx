@@ -236,31 +236,40 @@ const Donors = () => {
 
   // Handle phone request submission
   const handlePhoneRequestSubmit = async (requesterInfo) => {
-    if (!phoneRequestDonor) return;
+  if (!phoneRequestDonor) return;
 
-    // Send to WhatsApp
-    const whatsappMessage = encodeURIComponent(
-      `📞 *New Phone Number Request*\n\n` +
-      `*Donor Info:*\n` +
-      `Name: ${phoneRequestDonor.name}\n` +
-      `Blood Type: ${phoneRequestDonor.blood_type || 'Unknown'}\n` +
-      `Location: ${phoneRequestDonor.district || ''}${phoneRequestDonor.city ? ', ' + phoneRequestDonor.city : ''}\n\n` +
-      `*Requester Info:*\n` +
-      `Name: ${requesterInfo.name}\n` +
-      `Phone: ${requesterInfo.phone}\n` +
-      `Address: ${requesterInfo.address}\n` +
-      `Patient Problem: ${requesterInfo.patientProblem}\n\n` +
-      `*Donor Phone:* ${phoneRequestDonor.phone}\n` +
-      `---\n` +
-      `Requested at: ${new Date().toLocaleString()}`
-    );
-    
-    // Use your WhatsApp number here
-    const whatsappNumber = "+8801994984210"; // Replace with your actual WhatsApp number
-    
-    window.open(`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`, '_blank');
-    
-    // Mark this donor's phone as visible
+  // FIRST: Mark this donor's phone as visible
+  setVisiblePhones(prev => ({
+    ...prev,
+    [phoneRequestDonor.id]: {
+      phone: phoneRequestDonor.phone,
+      revealedAt: new Date().toISOString()
+    }
+  }));
+
+  // SECOND: Send to WhatsApp WITHOUT donor phone number
+  const whatsappMessage = encodeURIComponent(
+    `📞 *New Phone Number Request*\n\n` +
+    `*Donor Info:*\n` +
+    `Name: ${phoneRequestDonor.name}\n` +
+    `Blood Type: ${phoneRequestDonor.blood_type || 'Unknown'}\n` +
+    `Location: ${phoneRequestDonor.district || ''}${phoneRequestDonor.city ? ', ' + phoneRequestDonor.city : ''}\n\n` +
+    `*Requester Info:*\n` +
+    `Name: ${requesterInfo.name}\n` +
+    `Phone: ${requesterInfo.phone}\n` +
+    `Address: ${requesterInfo.address}\n` +
+    `Patient Problem: ${requesterInfo.patientProblem}\n\n` +
+    `---\n` +
+    `Requested at: ${new Date().toLocaleString()}`
+  );
+  
+  // Use your WhatsApp number here
+  const whatsappNumber = "+8801994984210"; // Replace with your actual WhatsApp number
+  
+  // Open WhatsApp in new tab
+  window.open(`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`, '_blank');
+  
+  // Mark this donor's phone as visible
     setVisiblePhones(prev => ({
       ...prev,
       [phoneRequestDonor.id]: {
@@ -269,8 +278,8 @@ const Donors = () => {
       }
     }));
     
-    setPhoneRequestModalOpen(false)
-    setPhoneRequestDonor(null)
+    // setPhoneRequestModalOpen(false)
+    // setPhoneRequestDonor(null)
   }
 
   // Clear visible phones (admin function)
@@ -285,7 +294,7 @@ const Donors = () => {
     try {
       let filtered = [...donors]
 
-      // Apply filters
+      // Apply filterssetPhoneRequestModalOpen(false)
       if (filters.search) {
         filtered = filtered.filter(donor =>
           donor.name?.toLowerCase().includes(filters.search.toLowerCase()) ||

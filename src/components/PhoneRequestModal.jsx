@@ -15,37 +15,43 @@ const PhoneRequestModal = ({ isOpen, onClose, onSubmit, donorName, donorBloodTyp
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // src/components/PhoneRequestModal.jsx - handleSubmit ফাংশন পরিবর্তন করুন
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  // Basic validation
+  if (!formData.name.trim() || !formData.phone.trim() || !formData.patientProblem.trim()) {
+    alert('Please fill in all required fields');
+    return;
+  }
+  
+  if (formData.phone.length < 11) {
+    alert('Please enter a valid phone number');
+    return;
+  }
+  
+  setLoading(true);
+  
+  try {
+    // First mark as submitted and show phone number
+    setSubmitted(true);
+    setShowPhoneNumber(true); // Show phone number immediately
     
-    // Basic validation
-    if (!formData.name.trim() || !formData.phone.trim() || !formData.patientProblem.trim()) {
-      alert('Please fill in all required fields');
-      return;
-    }
+    // Then send to WhatsApp
+    await onSubmit(formData);
     
-    if (formData.phone.length < 11) {
-      alert('Please enter a valid phone number');
-      return;
-    }
-    
-    setLoading(true);
-    
-    try {
-      await onSubmit(formData);
-      setSubmitted(true);
-      // Don't show phone number immediately, wait for user to acknowledge
-    } catch (error) {
-      console.error('Error submitting request:', error);
-      alert('Failed to submit request. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleShowPhoneNumber = () => {
-    setShowPhoneNumber(true);
-  };
+    // Don't close modal automatically - let user see the phone number
+    // Form data will be reset when modal closes
+  } catch (error) {
+    console.error('Error submitting request:', error);
+    alert('Failed to submit request. Please try again.');
+    // Reset on error
+    setSubmitted(false);
+    setShowPhoneNumber(false);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleCopyPhoneNumber = () => {
     if (donorPhone) {
