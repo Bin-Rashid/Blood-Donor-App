@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { Users, Filter, Download, RefreshCw, Search } from 'lucide-react'
-import { supabase } from '../services/supabase' // ✅ এই line যোগ করুন
+// src/pages/Donors.jsx
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { Users, Filter, Download, RefreshCw, Search, BookOpen } from 'lucide-react'
+import { supabase } from '../services/supabase'
 import { useAuth } from '../context/AuthContext'
 import DonorCard from '../components/DonorCard'
 import StatsCards from '../components/StatsCards'
 import EditModal from '../components/EditModal'
+import GuidelinesTab from '../components/GuidelinesTab'
 import { districts, bloodTypes } from '../utils/helpers'
 
 const Donors = () => {
@@ -22,6 +24,11 @@ const Donors = () => {
     recentDonors: 0
   })
 
+  const [activeSubTab, setActiveSubTab] = useState(() => {
+    const savedTab = localStorage.getItem('activeDonorsTab')
+    return savedTab || 'guidelines'
+  })
+
   const hasFetched = useRef(false)
 
   // Filters
@@ -34,16 +41,23 @@ const Donors = () => {
     sortBy: 'name-asc'
   })
 
+  // active tab localStorage এ save করা
   useEffect(() => {
-    if (!hasFetched.current) {
+    localStorage.setItem('activeDonorsTab', activeSubTab)
+  }, [activeSubTab])
+
+  useEffect(() => {
+    if (!hasFetched.current && activeSubTab === 'find-donors') {
       hasFetched.current = true
       fetchDonors()
     }
-  }, [])
+  }, [activeSubTab])
 
   useEffect(() => {
-    filterAndSortDonors()
-  }, [donors, filters])
+    if (activeSubTab === 'find-donors') {
+      filterAndSortDonors()
+    }
+  }, [donors, filters, activeSubTab])
 
   const fetchDonors = async () => {
     try {
@@ -174,7 +188,9 @@ const Donors = () => {
   }
 
   const handleUpdateDonor = () => {
-    fetchDonors()
+    if (activeSubTab === 'find-donors') {
+      fetchDonors()
+    }
   }
 
   const filterAndSortDonors = () => {
@@ -185,7 +201,8 @@ const Donors = () => {
       if (filters.search) {
         filtered = filtered.filter(donor =>
           donor.name?.toLowerCase().includes(filters.search.toLowerCase()) ||
-          donor.phone?.includes(filters.search)
+          donor.phone?.includes(filters.search) ||
+          donor.email?.toLowerCase().includes(filters.search.toLowerCase())
         )
       }
 
@@ -232,9 +249,9 @@ const Donors = () => {
             return (a.age || 0) - (b.age || 0)
           case 'age-desc':
             return (b.age || 0) - (a.age || 0)
-          case 'date-asc':
+          case 'created_at-asc':
             return new Date(a.created_at || 0) - new Date(b.created_at || 0)
-          case 'date-desc':
+          case 'created_at-desc':
             return new Date(b.created_at || 0) - new Date(a.created_at || 0)
           default:
             return 0
@@ -269,28 +286,39 @@ const Donors = () => {
 
   const exportData = () => {
     try {
+      const dataToExport = filteredDonors.length > 0 ? filteredDonors : donors
+      
       const csvContent = [
-        ['Name', 'Phone', 'Age', 'Blood Type', 'District', 'City', 'Last Donation', 'Status'],
-        ...filteredDonors.map(donor => [
-          donor.name || '',
-          donor.phone || '',
-          donor.age || '',
-          donor.blood_type || '',
-          donor.district || '',
-          donor.city || '',
-          donor.last_donation_date ? new Date(donor.last_donation_date).toLocaleDateString() : 'Never',
-          donor.last_donation_date ? 
-            (new Date(donor.last_donation_date) <= new Date(new Date().setMonth(new Date().getMonth() - 3)) ? 'Eligible' : 'Not Eligible') 
-            : 'Eligible'
-        ])
-      ].map(row => row.join(',')).join('\n')
+        ['Name', 'Email', 'Phone', 'Age', 'Blood Type', 'District', 'City', 'Last Donation', 'Status', 'Registration Date'],
+        ...dataToExport.map(donor => {
+          const lastDonation = donor.last_donation_date ? new Date(donor.last_donation_date) : null
+          const threeMonthsAgo = new Date()
+          threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+          const status = lastDonation ? (lastDonation <= threeMonthsAgo ? 'Eligible' : 'Not Eligible') : 'Eligible'
+          
+          return [
+            donor.name || '',
+            donor.email || '',
+            donor.phone || '',
+            donor.age || '',
+            donor.blood_type || '',
+            donor.district || '',
+            donor.city || '',
+            lastDonation ? lastDonation.toLocaleDateString() : 'Never',
+            status,
+            donor.created_at ? new Date(donor.created_at).toLocaleDateString() : ''
+          ]
+        })
+      ].map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')).join('\n')
 
-      const blob = new Blob([csvContent], { type: 'text/csv' })
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'blood-donors.csv'
+      a.download = `blood-donors-${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
       a.click()
+      document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (error) {
       console.error('Error exporting data:', error)
@@ -298,16 +326,176 @@ const Donors = () => {
     }
   }
 
-  console.log('🎯 Donors component - loading:', loading, 'donors count:', donors.length)
+  // Tab change handler
+  const handleTabChange = (tab) => {
+    setActiveSubTab(tab)
+    if (tab === 'find-donors' && !hasFetched.current) {
+      hasFetched.current = true
+      fetchDonors()
+    }
+  }
 
-  if (loading) {
-    return (
-      <div className="p-6 flex justify-center items-center min-h-64">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2 text-red-600" />
-          <p className="text-gray-600">Loading donors...</p>
+  console.log('🎯 Donors component - active tab:', activeSubTab, 'loading:', loading, 'donors count:', donors.length)
+
+  const renderFindDonorsContent = () => {
+    if (loading) {
+      return (
+        <div className="p-6 flex justify-center items-center min-h-64">
+          <div className="text-center">
+            <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2 text-red-600" />
+            <p className="text-gray-600">Loading donors...</p>
+          </div>
         </div>
-      </div>
+      )
+    }
+
+    return (
+      <>
+        {/* Statistics */}
+        <StatsCards stats={stats} />
+
+        {/* Admin Controls */}
+        <div className="flex gap-4 mb-6 flex-wrap">
+          <button
+            onClick={fetchDonors}
+            className="btn-primary py-2 flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh Data
+          </button>
+          <button
+            onClick={exportData}
+            className="btn-outline py-2 flex items-center gap-2"
+            disabled={donors.length === 0}
+          >
+            <Download className="w-4 h-4" />
+            Export Data ({donors.length})
+          </button>
+        </div>
+
+        {/* Sort Controls */}
+        <div className="flex items-center gap-4 mb-6">
+          <span className="text-sm font-medium text-gray-700">Sort by:</span>
+          <select
+            value={filters.sortBy}
+            onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+            className="form-input w-auto"
+          >
+            <option value="name-asc">Name (A-Z)</option>
+            <option value="name-desc">Name (Z-A)</option>
+            <option value="age-asc">Age (Low to High)</option>
+            <option value="age-desc">Age (High to Low)</option>
+            <option value="created_at-asc">Registration Date (Oldest)</option>
+            <option value="created_at-desc">Registration Date (Newest)</option>
+          </select>
+        </div>
+
+        {/* Search and Filters */}
+        <div className="card p-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by name, phone, or email..."
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                className="form-input pl-10"
+              />
+            </div>
+            
+            <select
+              value={filters.bloodType}
+              onChange={(e) => handleFilterChange('bloodType', e.target.value)}
+              className="form-input"
+            >
+              <option value="">All Blood Types</option>
+              {bloodTypes.map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+
+            <select
+              value={filters.district}
+              onChange={(e) => handleFilterChange('district', e.target.value)}
+              className="form-input"
+            >
+              <option value="">All Districts</option>
+              {districts.map(district => (
+                <option key={district} value={district}>{district}</option>
+              ))}
+            </select>
+
+            <input
+              type="text"
+              placeholder="Filter by city..."
+              value={filters.city}
+              onChange={(e) => handleFilterChange('city', e.target.value)}
+              className="form-input"
+            />
+
+            <select
+              value={filters.status}
+              onChange={(e) => handleFilterChange('status', e.target.value)}
+              className="form-input"
+            >
+              <option value="">All Status</option>
+              <option value="eligible">Eligible Now</option>
+              <option value="not-eligible">Not Eligible</option>
+            </select>
+          </div>
+
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-gray-600">
+              Showing {filteredDonors.length} of {donors.length} donors
+              {filters.search && ` for "${filters.search}"`}
+              {filters.bloodType && ` with blood type "${filters.bloodType}"`}
+              {filters.district && ` in district "${filters.district}"`}
+              {filters.status && ` with status "${filters.status}"`}
+            </p>
+            <button
+              onClick={clearFilters}
+              className="btn-outline py-2 text-sm flex items-center gap-2"
+            >
+              <Filter className="w-4 h-4" />
+              Clear Filters
+            </button>
+          </div>
+        </div>
+
+        {/* Donors Grid */}
+        {filteredDonors.length === 0 ? (
+          <div className="text-center py-12">
+            <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">No donors found</h3>
+            <p className="text-gray-500">
+              {donors.length === 0 
+                ? 'No donors have registered yet. Be the first to register!'
+                : 'Try adjusting your filters to see more results.'
+              }
+            </p>
+            {donors.length > 0 && (
+              <button onClick={clearFilters} className="btn-primary mt-4">
+                Clear All Filters
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredDonors.map(donor => (
+              <DonorCard
+                key={donor.id}
+                donor={donor}
+                onEdit={() => handleEditDonor(donor)}
+                onDelete={() => handleDeleteDonor(donor)}
+                deleteLoading={deleteLoading === donor.id}
+                isAdmin={isAdmin}
+                currentUserId={user?.id}
+              />
+            ))}
+          </div>
+        )}
+      </>
     )
   }
 
@@ -321,162 +509,53 @@ const Donors = () => {
               <Users className="w-5 h-5" />
               Admin Panel
             </h3>
-            <div className="flex gap-2">
-              <button className="btn-outline py-2 text-sm">
-                Edit Footer
-              </button>
-              <button className="btn-outline py-2 text-sm">
-                Logout Admin
-              </button>
+            <div className="text-sm text-gray-600">
+              You have full access to manage all donor records
             </div>
           </div>
           <p className="text-gray-600">
-            You are logged in as an administrator. You can now edit and delete donor records.
+            You are logged in as an administrator. You can now edit and delete all donor records.
           </p>
         </div>
       )}
 
       <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-2">
         <Users className="w-6 h-6" />
-        Find Blood Donors
+        Find Donors
       </h2>
       <p className="text-gray-600 mb-6">Connect with available donors in your area</p>
 
-      {/* Statistics */}
-      <StatsCards stats={stats} />
-
-      {/* Admin Controls */}
-      <div className="flex gap-4 mb-6 flex-wrap">
+      {/* Sub Tabs */}
+      <div className="flex border-b border-gray-200 mb-6">
         <button
-          onClick={fetchDonors}
-          className="btn-primary py-2"
+          onClick={() => handleTabChange('guidelines')}
+          className={`flex items-center gap-2 px-4 py-3 font-medium transition-all ${
+            activeSubTab === 'guidelines'
+              ? 'text-red-600 border-b-2 border-red-600'
+              : 'text-gray-600 hover:text-red-600'
+          }`}
         >
-          <RefreshCw className="w-4 h-4" />
-          Refresh Data
+          <BookOpen className="w-4 h-4" />
+          গুরুত্বপূর্ণ দিকনির্দেশনা
         </button>
         <button
-          onClick={exportData}
-          className="btn-outline py-2"
-          disabled={filteredDonors.length === 0}
+          onClick={() => handleTabChange('find-donors')}
+          className={`flex items-center gap-2 px-4 py-3 font-medium transition-all ${
+            activeSubTab === 'find-donors'
+              ? 'text-red-600 border-b-2 border-red-600'
+              : 'text-gray-600 hover:text-red-600'
+          }`}
         >
-          <Download className="w-4 h-4" />
-          Export Data
+          <Users className="w-4 h-4" />
+          Find Blood Donors
         </button>
       </div>
 
-      {/* Sort Controls */}
-      <div className="flex items-center gap-4 mb-6">
-        <span className="text-sm font-medium text-gray-700">Sort by:</span>
-        <select
-          value={filters.sortBy}
-          onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-          className="form-input w-auto"
-        >
-          <option value="name-asc">Name (A-Z)</option>
-          <option value="name-desc">Name (Z-A)</option>
-          <option value="age-asc">Age (Low to High)</option>
-          <option value="age-desc">Age (High to Low)</option>
-          <option value="date-asc">Registration Date (Oldest)</option>
-          <option value="date-desc">Registration Date (Newest)</option>
-        </select>
-      </div>
+      {/* Guidelines Tab Content */}
+      {activeSubTab === 'guidelines' && <GuidelinesTab />}
 
-      {/* Search and Filters */}
-      <div className="card p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by name or phone..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="form-input pl-10"
-            />
-          </div>
-          
-          <select
-            value={filters.bloodType}
-            onChange={(e) => handleFilterChange('bloodType', e.target.value)}
-            className="form-input"
-          >
-            <option value="">All Blood Types</option>
-            {bloodTypes.map(type => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </select>
-
-          <select
-            value={filters.district}
-            onChange={(e) => handleFilterChange('district', e.target.value)}
-            className="form-input"
-          >
-            <option value="">All Districts</option>
-            {districts.map(district => (
-              <option key={district} value={district}>{district}</option>
-            ))}
-          </select>
-
-          <input
-            type="text"
-            placeholder="Filter by city..."
-            value={filters.city}
-            onChange={(e) => handleFilterChange('city', e.target.value)}
-            className="form-input"
-          />
-
-          <select
-            value={filters.status}
-            onChange={(e) => handleFilterChange('status', e.target.value)}
-            className="form-input"
-          >
-            <option value="">All Status</option>
-            <option value="eligible">Eligible Now</option>
-            <option value="not-eligible">Not Eligible</option>
-          </select>
-        </div>
-
-        <div className="flex justify-between items-center">
-          <p className="text-sm text-gray-600">
-            Showing {filteredDonors.length} of {donors.length} donors
-          </p>
-          <button
-            onClick={clearFilters}
-            className="btn-outline py-2 text-sm"
-          >
-            <Filter className="w-4 h-4" />
-            Clear Filters
-          </button>
-        </div>
-      </div>
-
-      {/* Donors Grid */}
-      {filteredDonors.length === 0 ? (
-        <div className="text-center py-12">
-          <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <h3 className="text-xl font-semibold text-gray-600 mb-2">No donors found</h3>
-          <p className="text-gray-500">
-            {donors.length === 0 
-              ? 'No donors have registered yet. Be the first to register!'
-              : 'Try adjusting your filters to see more results.'
-            }
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredDonors.map(donor => (
-            <DonorCard
-              key={donor.id}
-              donor={donor}
-              onEdit={() => handleEditDonor(donor)}
-              onDelete={() => handleDeleteDonor(donor)}
-              deleteLoading={deleteLoading === donor.id}
-              isAdmin={isAdmin}
-              currentUserId={user?.id}
-            />
-          ))}
-        </div>
-      )}
+      {/* Find Donors Tab Content */}
+      {activeSubTab === 'find-donors' && renderFindDonorsContent()}
 
       {/* Edit Modal */}
       <EditModal
