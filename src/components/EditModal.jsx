@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { X, Save, User, Phone, Cake, Droplets, MapPin, Home, Calendar, Camera } from 'lucide-react'
+import { X, Save, User, Phone, Cake, Droplets, MapPin, Home, Calendar, Camera, Loader2 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { districts, bloodTypes } from '../utils/helpers'
+import { compressDonorImage } from '../utils/imageCompression'
 
 const EditModal = ({ isOpen, onClose, donor, onUpdate }) => {
   const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false) // New state for image upload
   const [profilePicture, setProfilePicture] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
@@ -15,6 +17,9 @@ const EditModal = ({ isOpen, onClose, donor, onUpdate }) => {
     city: '',
     last_donation_date: ''
   })
+
+  // New state for compressed image file
+  const [compressedImageFile, setCompressedImageFile] = useState(null)
 
   useEffect(() => {
     if (donor) {
@@ -40,9 +45,46 @@ const EditModal = ({ isOpen, onClose, donor, onUpdate }) => {
     }))
   }
 
-  const handleProfilePictureChange = (e) => {
+  const handleProfilePictureChange = async (e) => {
     const file = e.target.files[0]
-    setProfilePicture(file)
+    if (!file) return
+
+    // Check if it's an image
+    if (!file.type.match('image.*')) {
+      alert('Please select an image file')
+      return
+    }
+
+    setUploading(true)
+
+    try {
+      // Auto compress image before uploading
+      console.log('Compressing image...')
+      const compressedFile = await compressDonorImage(file)
+      
+      // Convert to base64 for preview
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        // Create a preview URL for the compressed image
+        const previewUrl = e.target.result
+        // We'll store this in formData for immediate preview
+        setFormData(prev => ({
+          ...prev,
+          _previewPicture: previewUrl // Temporary field for preview
+        }))
+      }
+      reader.readAsDataURL(compressedFile)
+
+      // Store the compressed file for upload
+      setCompressedImageFile(compressedFile)
+      
+      console.log('Image compressed successfully')
+    } catch (error) {
+      console.error('Image compression error:', error)
+      alert('Failed to process image. Please try another image.')
+    } finally {
+      setUploading(false)
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -53,21 +95,28 @@ const EditModal = ({ isOpen, onClose, donor, onUpdate }) => {
       let profilePictureUrl = donor.profile_picture
 
       // Upload new profile picture if selected
-      if (profilePicture) {
-        const fileExt = profilePicture.name.split('.').pop()
-        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+      if (compressedImageFile) {
+        const fileExt = 'jpg' // Always use jpg after compression
+        const fileName = `${donor.id}_${Date.now()}.${fileExt}`
         
         const { error: uploadError } = await supabase.storage
           .from('profile-pictures')
-          .upload(fileName, profilePicture)
+          .upload(fileName, compressedImageFile, {
+            cacheControl: '3600',
+            upsert: true
+          })
 
-        if (uploadError) throw uploadError
+        if (uploadError) {
+          console.error('Upload error:', uploadError)
+          throw uploadError
+        }
 
         const { data: { publicUrl } } = supabase.storage
           .from('profile-pictures')
           .getPublicUrl(fileName)
 
         profilePictureUrl = publicUrl
+        console.log('Image uploaded to:', publicUrl)
       }
 
       // Direct update without RLS policy recursion
@@ -79,8 +128,12 @@ const EditModal = ({ isOpen, onClose, donor, onUpdate }) => {
         district: formData.district,
         city: formData.city,
         last_donation_date: formData.last_donation_date,
-        profile_picture: profilePictureUrl,
         updated_at: new Date().toISOString()
+      }
+
+      // Only add profile picture if it was updated
+      if (profilePictureUrl !== donor.profile_picture) {
+        updateData.profile_picture = profilePictureUrl
       }
 
       console.log('Updating donor with data:', updateData)
@@ -113,12 +166,22 @@ const EditModal = ({ isOpen, onClose, donor, onUpdate }) => {
         errorMessage = 'Database policy error. Please contact administrator.'
       } else if (error.code === '42501') {
         errorMessage = 'Permission denied. You can only edit your own profile.'
+      } else if (error.message.includes('storage')) {
+        errorMessage = 'Failed to upload image. Please try again.'
       }
       
       alert(errorMessage)
     } finally {
       setLoading(false)
     }
+  }
+
+  // Function to get the profile picture for display
+  const getProfilePicture = () => {
+    if (formData._previewPicture) {
+      return formData._previewPicture
+    }
+    return donor.profile_picture
   }
 
   return (
@@ -141,35 +204,55 @@ const EditModal = ({ isOpen, onClose, donor, onUpdate }) => {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Profile Picture Upload */}
             <div className="flex flex-col items-center gap-4">
-              <div className="w-24 h-24 rounded-full bg-gray-200 border-4 border-red-100 flex items-center justify-center text-gray-500 text-2xl font-bold overflow-hidden">
-                {profilePicture ? (
-                  <img
-                    src={URL.createObjectURL(profilePicture)}
-                    alt="Preview"
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                ) : donor.profile_picture ? (
-                  <img
-                    src={donor.profile_picture}
-                    alt={donor.name}
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                ) : (
-                  donor.name.charAt(0).toUpperCase()
+              <div className="relative">
+                <div className="w-24 h-24 rounded-full bg-gray-200 border-4 border-red-100 flex items-center justify-center text-gray-500 text-2xl font-bold overflow-hidden">
+                  {uploading ? (
+                    <div className="flex items-center justify-center w-full h-full">
+                      <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
+                    </div>
+                  ) : getProfilePicture() ? (
+                    <img
+                      src={getProfilePicture()}
+                      alt="Profile"
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    donor.name.charAt(0).toUpperCase()
+                  )}
+                </div>
+                
+                {/* Uploading indicator */}
+                {uploading && (
+                  <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">Compressing...</span>
+                  </div>
                 )}
               </div>
-              <label className="cursor-pointer">
+              
+              <label className="cursor-pointer relative">
                 <input
                   type="file"
                   accept="image/*"
                   onChange={handleProfilePictureChange}
                   className="hidden"
+                  disabled={uploading}
                 />
-                <span className="btn-outline py-2 px-4 text-sm">
+                <span className={`btn-outline py-2 px-4 text-sm flex items-center gap-2 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <Camera className="w-4 h-4" />
-                  Change Profile Picture
+                  {uploading ? 'Processing...' : 'Change Profile Picture'}
                 </span>
+                {uploading && (
+                  <div className="absolute -top-2 -right-2">
+                    <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
               </label>
+              
+              {compressedImageFile && (
+                <div className="text-xs text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                  ✓ Image compressed for optimal storage
+                </div>
+              )}
             </div>
 
             {/* Name */}
@@ -304,16 +387,26 @@ const EditModal = ({ isOpen, onClose, donor, onUpdate }) => {
             <div className="flex gap-4 pt-4">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || uploading}
                 className="flex-1 bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                <Save className="w-4 h-4" />
-                {loading ? 'Updating...' : 'Update Profile'}
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Update Profile
+                  </>
+                )}
               </button>
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+                disabled={uploading}
+                className={`flex-1 border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-semibold transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}
               >
                 Cancel
               </button>

@@ -89,7 +89,7 @@ const AuthModal = ({ isOpen, onClose }) => {
           </h3>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-red-600 rounded-lg transition-colors bg-red-500"
           >
             <X className="w-5 h-5" />
           </button>

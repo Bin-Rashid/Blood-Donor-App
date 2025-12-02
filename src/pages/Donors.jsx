@@ -264,7 +264,7 @@ const Donors = () => {
   );
   
   // Use your WhatsApp number here
-  const whatsappNumber = "+8801994984210"; // Replace with your actual WhatsApp number
+  const whatsappNumber = "+8801959601901"; // Replace with your actual WhatsApp number
   
   // Open WhatsApp in new tab
   window.open(`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`, '_blank');

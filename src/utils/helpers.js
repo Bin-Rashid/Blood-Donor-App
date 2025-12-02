@@ -1,5 +1,6 @@
 // src/utils/helpers.js
 import { useState, useEffect } from 'react';
+import { compressDonorImage } from './imageCompression';
 
 export const calculateEligibility = (lastDonationDate) => {
   const lastDonation = new Date(lastDonationDate)
@@ -189,3 +190,64 @@ export const sortDonors = (donors, sortBy) => {
   
   return sorted
 }
+
+// Simple wrapper function for image compression
+export const autoReduceImageSize = async (imageFile) => {
+  try {
+    return await compressDonorImage(imageFile);
+  } catch (error) {
+    console.error('Auto image reduction failed:', error);
+    throw error;
+  }
+};
+
+// Additional helper functions you might want to add:
+
+// Check if donor is eligible for donation
+export const isDonorEligible = (lastDonationDate) => {
+  if (!lastDonationDate) return true;
+  
+  const lastDonation = new Date(lastDonationDate);
+  const today = new Date();
+  const threeMonthsAgo = new Date();
+  threeMonthsAgo.setMonth(today.getMonth() - 3);
+  
+  return lastDonation <= threeMonthsAgo;
+};
+
+// Get days until next eligible donation
+export const getDaysUntilEligible = (lastDonationDate) => {
+  if (!lastDonationDate) return 0;
+  
+  const lastDonation = new Date(lastDonationDate);
+  const today = new Date();
+  const nextEligibleDate = new Date(lastDonation);
+  nextEligibleDate.setMonth(lastDonation.getMonth() + 3);
+  
+  const daysLeft = Math.ceil((nextEligibleDate - today) / (1000 * 60 * 60 * 24));
+  return Math.max(0, daysLeft);
+};
+
+// Format file size for display
+export const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+// Get current date in YYYY-MM-DD format
+export const getCurrentDate = () => {
+  const today = new Date();
+  return today.toISOString().split('T')[0];
+};
+
+// Get date X days ago
+export const getDateDaysAgo = (days) => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().split('T')[0];
+};
