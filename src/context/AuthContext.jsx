@@ -1,373 +1,281 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 
-const AuthContext = createContext({});
+// Helper function to check admin status from localStorage
+const checkAdminStatus = () => {
+  try {
+    const isAdmin = localStorage.getItem('isAdmin')
+    const adminUser = localStorage.getItem('adminUser')
+    
+    if (isAdmin === 'true' && adminUser) {
+      const parsedUser = JSON.parse(adminUser)
+      return parsedUser
+    }
+    return null
+  } catch (err) {
+    console.warn('Error checking admin status:', err)
+    return null
+  }
+}
 
-export const useAuth = () => useContext(AuthContext);
+const AuthContext = createContext({
+  user: null,
+  loading: true,
+  isAdmin: false,
+  adminUser: null,
+  signUp: async () => ({}),
+  signIn: async () => ({}),
+  signOut: async () => ({}),
+  adminSignOut: async () => ({}),
+});
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null)
+  const [adminUser, setAdminUser] = useState(() => checkAdminStatus()) // Initialize from localStorage
+  const [loading, setLoading] = useState(true)
+  const [initialised, setInitialised] = useState(false)
 
-  // Check admin status from localStorage and database
-  const checkAdminStatus = async (email) => {
-    try {
-      const { data, error } = await supabase
-        .from('admin')
-        .select('*')
-        .eq('email', email)
-        .eq('is_active', true)
-        .single();
-
-      if (error || !data) {
-        console.log('Not an admin or admin not found');
-        setIsAdmin(false);
-        localStorage.removeItem('admin_session');
-        return false;
-      }
-
-      setIsAdmin(true);
-      return true;
-    } catch (error) {
-      console.error('Error checking admin status:', error);
-      setIsAdmin(false);
-      localStorage.removeItem('admin_session');
-      return false;
-    }
-  };
-
-  // Load admin session from localStorage
-  const loadAdminSession = async () => {
-    try {
-      const adminSession = localStorage.getItem('admin_session');
-      if (!adminSession) {
-        return false;
-      }
-
-      const sessionData = JSON.parse(adminSession);
-      const { email, adminId, loginTime } = sessionData;
-
-      // Check if session is expired (24 hours)
-      const sessionAge = Date.now() - new Date(loginTime).getTime();
-      const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-
-      if (sessionAge > maxAge) {
-        localStorage.removeItem('admin_session');
-        return false;
-      }
-
-      // Verify admin still exists and is active
-      const { data: adminData, error } = await supabase
-        .from('admin')
-        .select('*')
-        .eq('id', adminId)
-        .eq('email', email)
-        .eq('is_active', true)
-        .single();
-
-      if (error || !adminData) {
-        localStorage.removeItem('admin_session');
-        return false;
-      }
-
-      // Set admin user
-      const adminUser = {
-        id: adminId,
-        email: email,
-        user_metadata: {
-          name: adminData.full_name || 'Administrator',
-          role: adminData.role || 'admin'
-        },
-        isAdmin: true
-      };
-
-      setUser(adminUser);
-      setIsAdmin(true);
-      
-      return true;
-    } catch (error) {
-      console.error('Error loading admin session:', error);
-      localStorage.removeItem('admin_session');
-      return false;
-    }
-  };
-
+  // Load admin status from localStorage on mount
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        // First try to load admin session
-        const adminLoaded = await loadAdminSession();
-        
-        if (!adminLoaded) {
-          // If no admin session, check regular Supabase auth
-          const { data: { session }, error } = await supabase.auth.getSession();
-          
-          if (error) {
-            console.error('Session error:', error);
-            setUser(null);
-            setIsAdmin(false);
-          } else {
-            setUser(session?.user ?? null);
-            
-            // Check if this user is also an admin
-            if (session?.user?.email) {
-              await checkAdminStatus(session.user.email);
-            } else {
-              setIsAdmin(false);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-        setUser(null);
-        setIsAdmin(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
-
-    // Listen for auth changes (only for regular users)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event);
-        
-        // If we already have an admin session, don't override it
-        const adminSession = localStorage.getItem('admin_session');
-        if (adminSession) {
-          console.log('Admin session exists, skipping auth change');
-          return;
-        }
-        
-        setUser(session?.user ?? null);
-        
-        if (session?.user?.email) {
-          await checkAdminStatus(session.user.email);
-        } else {
-          setIsAdmin(false);
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
+    const admin = checkAdminStatus();
+    if (admin) {
+      setAdminUser(admin);
+    }
   }, []);
 
-  // ✅ UPDATED: Admin login function
-  const adminLogin = async (email, password) => {
-    try {
-      console.log('🔐 Admin login attempt for:', email);
+  // Main auth effect
+  useEffect(() => {
+    let mounted = true;
+    let listener = null;
 
-      // 1. Verify admin credentials
-      const { data: verifyData, error: verifyError } = await supabase
-        .rpc('verify_admin_password', {
-          p_email: email,
-          p_password: password
+    (async () => {
+      try {
+        if (!supabase || !supabase.auth) {
+          console.warn('Supabase client not available');
+          if (mounted) {
+            setUser(null);
+            setLoading(false);
+            setInitialised(true);
+          }
+          return;
+        }
+
+        const res = await supabase.auth.getSession();
+        if (mounted) {
+          setUser(res?.data?.session?.user ?? null);
+          setLoading(false);
+          setInitialised(true);
+        }
+
+        // Subscribe to auth changes
+        listener = supabase.auth.onAuthStateChange((event, session) => {
+          try {
+            if (!mounted) return;
+            console.log('Auth state changed:', event, session?.user?.email);
+            setUser(session?.user ?? null);
+          } catch (err) {
+            console.warn('Error handling auth state change', err);
+          }
         });
-
-      if (verifyError) {
-        throw new Error('Database error: ' + verifyError.message);
+      } catch (err) {
+        console.warn('Error initializing auth:', err);
+        if (mounted) {
+          setUser(null);
+          setLoading(false);
+          setInitialised(true);
+        }
       }
+    })();
 
-      if (!verifyData || verifyData.length === 0 || !verifyData[0].is_valid) {
-        throw new Error('Invalid admin credentials');
+    return () => {
+      mounted = false;
+      try {
+        if (listener && listener.data && typeof listener.data.subscription?.unsubscribe === 'function') {
+          listener.data.subscription.unsubscribe();
+        }
+      } catch (err) {
+        // Ignore cleanup errors
       }
+    };
+  }, []);
 
-      const adminId = verifyData[0].admin_id;
-
-      // 2. Get admin details
-      const { data: adminData, error: adminError } = await supabase
-        .from('admin')
-        .select('*')
-        .eq('id', adminId)
-        .single();
-
-      if (adminError || !adminData) {
-        throw new Error('Admin not found');
-      }
-
-      // 3. Update last login
-      await supabase
-        .from('admin')
-        .update({ 
-          last_login: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', adminId);
-
-      // 4. Create admin session in localStorage
-      const adminSession = {
-        adminId,
-        email,
-        name: adminData.full_name,
-        role: adminData.role,
-        loginTime: new Date().toISOString()
-      };
-      
-      localStorage.setItem('admin_session', JSON.stringify(adminSession));
-
-      // 5. Set state WITHOUT reloading page
-      const adminUser = {
-        id: adminId,
-        email: email,
-        user_metadata: {
-          name: adminData.full_name || 'Administrator',
-          role: adminData.role || 'admin'
-        },
-        isAdmin: true
-      };
-      
-      setUser(adminUser);
-      setIsAdmin(true);
-
-      console.log('✅ Admin login successful');
-      return { 
-        success: true, 
-        admin: adminData,
-        user: adminUser
-      };
-
-    } catch (error) {
-      console.error('❌ Admin login error:', error);
-      localStorage.removeItem('admin_session');
-      setIsAdmin(false);
-      throw error;
-    }
-  };
-
-  // Regular user signup
-  const signUp = async (email, password, userData) => {
+  // Sign up function
+  const signUp = useCallback(async (email, password, metadata = {}) => {
     try {
-      console.log('Starting registration for:', email);
-      
-      if (!email || !password) {
-        throw new Error('Email and password are required');
+      if (!supabase || !supabase.auth) {
+        throw new Error('Auth client not available');
       }
 
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const result = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: metadata
+        }
       });
 
-      if (authError) throw authError;
-
-      if (authData.user) {
-        console.log('User created, creating donor profile...');
-        
-        const donorData = {
-          id: authData.user.id,
-          email: authData.user.email,
-          ...userData,
-        };
-
-        const { error: donorError } = await supabase
-          .from('donors')
-          .insert([donorData]);
-
-        if (donorError) throw donorError;
-
-        console.log('Donor profile created successfully');
-        
-        // Check if this user is also an admin
-        await checkAdminStatus(email);
-        
-        return authData;
+      if (result?.error) {
+        return { error: result.error, data: result.data ?? null };
       }
 
-      return authData;
-    } catch (error) {
-      console.error('Registration error:', error);
-      throw error;
+      return { data: result?.data ?? null, error: null };
+    } catch (err) {
+      return { error: err, data: null };
     }
-  };
+  }, []);
 
-  // Regular user login
-  const signIn = async (email, password) => {
+  // Sign in function
+  const signIn = useCallback(async (email, password) => {
     try {
-      console.log('Signing in:', email);
+      if (!supabase || !supabase.auth) {
+        throw new Error('Auth client not available');
+      }
       
-      // Clear any existing admin session
-      localStorage.removeItem('admin_session');
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const result = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
       });
-
-      if (error) throw error;
-
-      console.log('Sign in successful');
       
-      // Check if this user is an admin
-      await checkAdminStatus(email);
-      
-      return data;
-    } catch (error) {
-      console.error('Sign in process error:', error);
-      throw error;
-    }
-  };
-
-  // Sign out (both admin and regular user)
-  const signOut = async () => {
-    try {
-      console.log('Signing out...');
-      
-      // Clear admin session
-      localStorage.removeItem('admin_session');
-      
-      // Clear Supabase session if it exists
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const { error } = await supabase.auth.signOut();
-        if (error) console.error('Supabase signout error:', error);
+      if (result?.error) {
+        return { error: result.error, data: null };
       }
       
-      // Clear local state
+      return { data: result?.data ?? null, error: null };
+    } catch (err) {
+      return { error: err, data: null };
+    }
+  }, []);
+
+  // Regular sign out (for regular users)
+  const signOut = useCallback(async () => {
+    try {
+      if (!supabase || !supabase.auth) {
+        throw new Error('Auth client not available');
+      }
+      
+      const result = await supabase.auth.signOut();
+      if (result?.error) {
+        return { error: result.error };
+      }
+      
       setUser(null);
-      setIsAdmin(false);
-      
-      console.log('Sign out successful');
-    } catch (error) {
-      console.error('Sign out error:', error);
-      throw error;
+      return { error: null };
+    } catch (err) {
+      return { error: err };
     }
-  };
+  }, []);
 
-  // Forgot password
-  const forgotPassword = async (email) => {
+  // Admin sign out
+  const adminSignOut = useCallback(async () => {
     try {
-      console.log('Sending password reset email to:', email);
-
-      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-
-      if (error) throw error;
-
-      console.log('Password reset email sent successfully');
-      return data;
-    } catch (error) {
-      console.error('Password reset process error:', error);
-      throw error;
+      localStorage.removeItem('isAdmin');
+      localStorage.removeItem('adminUser');
+      localStorage.removeItem('adminToken');
+      setAdminUser(null);
+      
+      // Also sign out from regular auth if logged in
+      if (user) {
+        await supabase.auth.signOut();
+        setUser(null);
+      }
+      
+      return { error: null };
+    } catch (err) {
+      console.error('Admin sign out error:', err);
+      return { error: err };
     }
-  };
+  }, [user]);
 
-  const value = {
-    user,
-    isAdmin,
-    loading,
-    signUp,
-    signIn,
-    signOut,
-    adminLogin,
-    forgotPassword,
-  };
+  // Set admin user (called from AdminLoginModal after successful login)
+  const setAdminUserContext = useCallback((adminData) => {
+    try {
+      const adminSession = {
+        id: adminData.id,
+        email: adminData.email,
+        name: adminData.name || 'Administrator',
+        role: 'admin',
+        loggedInAt: new Date().toISOString()
+      }
+      
+      localStorage.setItem('adminUser', JSON.stringify(adminSession))
+      localStorage.setItem('isAdmin', 'true')
+      localStorage.setItem('adminToken', Math.random().toString(36).substring(2))
+      
+      setAdminUser(adminSession)
+    } catch (err) {
+      console.error('Error setting admin user:', err)
+    }
+  }, [])
+
+  // Derive isAdmin from both sources
+  const isAdmin = useMemo(() => {
+    try {
+      // Check localStorage admin first
+      if (adminUser) {
+        return true
+      }
+      
+      // Check Supabase user metadata
+      if (!user) return false
+      
+      const role = user?.app_metadata?.role ?? 
+                   user?.user_metadata?.role ?? 
+                   user?.user_metadata?.is_admin
+      
+      if (role === true || role === 'true') return true
+      if (typeof role === 'string' && role.toLowerCase() === 'admin') return true
+      
+      return false
+    } catch (err) {
+      return false
+    }
+  }, [user, adminUser])
+
+  // Combined user object (prefers admin user if exists)
+  const currentUser = useMemo(() => {
+    return adminUser || user;
+  }, [user, adminUser]);
+
+  // Show loading state
+  if (!initialised) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
+    <AuthContext.Provider 
+      value={{ 
+        user: adminUser || user, // Prefer admin user if exists
+        loading, 
+        isAdmin, 
+        adminUser,
+        signUp, 
+        signIn, 
+        signOut,
+        setAdminUser: setAdminUserContext, // Add this
+        adminSignOut: () => {
+          localStorage.removeItem('isAdmin')
+          localStorage.removeItem('adminUser')
+          localStorage.removeItem('adminToken')
+          setAdminUser(null)
+        }
+      }}
+    >
+      {children}
     </AuthContext.Provider>
   );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };

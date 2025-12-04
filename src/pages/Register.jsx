@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { User, Phone, Cake, Droplets, MapPin, Home, Calendar, Camera, Loader } from 'lucide-react';
 import { districts, bloodTypes } from '../utils/helpers';
 import { supabase } from '../services/supabase';
@@ -33,14 +33,36 @@ const Register = () => {
   };
 
   const handleProfilePictureChange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
     setProfilePicture(file);
   };
+
+  // safely create object URL for preview and revoke when changed/unmount
+  const previewUrl = useMemo(() => {
+    try {
+      return profilePicture ? URL.createObjectURL(profilePicture) : null;
+    } catch (err) {
+      console.warn('Failed to create preview URL', err);
+      return null;
+    }
+  }, [profilePicture]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        try {
+          URL.revokeObjectURL(previewUrl);
+        } catch (err) {
+          // ignore revoke errors
+        }
+      }
+    };
+  }, [previewUrl]);
 
   const validateForm = () => {
     // Check all required fields
     const requiredFields = ['name', 'email', 'password', 'phone', 'age', 'district', 'city', 'last_donation_date'];
-    const missingFields = requiredFields.filter(field => !formData[field].trim());
+    const missingFields = requiredFields.filter(field => !(formData[field] || '').toString().trim());
     
     if (missingFields.length > 0) {
       setError(`Please fill all required fields: ${missingFields.join(', ')}`);
@@ -55,7 +77,7 @@ const Register = () => {
     }
 
     // Validate password length
-    if (formData.password.length < 6) {
+    if ((formData.password || '').length < 6) {
       setError('Password must be at least 6 characters');
       return false;
     }
@@ -68,8 +90,8 @@ const Register = () => {
     }
 
     // Validate age
-    const age = parseInt(formData.age);
-    if (age < 18 || age > 65) {
+    const age = parseInt(formData.age, 10);
+    if (isNaN(age) || age < 18 || age > 65) {
       setError('Age must be between 18 and 65 years');
       return false;
     }
@@ -95,20 +117,23 @@ const Register = () => {
       // Upload profile picture if selected
       if (profilePicture) {
         try {
-          const fileExt = profilePicture.name.split('.').pop();
-          const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+          const fileExt = (profilePicture.name || '').split('.').pop();
+          const fileName = `${Math.random().toString(36).substring(2)}.${fileExt || 'jpg'}`;
           
-          const { error: uploadError } = await supabase.storage
+          const uploadResult = await supabase.storage
             .from('profile-pictures')
             .upload(fileName, profilePicture);
 
+          // handle different supabase response shapes
+          const uploadError = uploadResult?.error ?? (uploadResult?.data?.error ?? null);
           if (uploadError) throw uploadError;
 
-          const { data: { publicUrl } } = supabase.storage
+          const publicUrlResult = await supabase.storage
             .from('profile-pictures')
             .getPublicUrl(fileName);
 
-          profilePictureUrl = publicUrl;
+          // support different shapes: { data: { publicUrl } } or { publicUrl }
+          profilePictureUrl = publicUrlResult?.data?.publicUrl ?? publicUrlResult?.publicUrl ?? null;
         } catch (uploadError) {
           console.warn('Profile picture upload failed:', uploadError);
           // Continue without profile picture
@@ -117,25 +142,29 @@ const Register = () => {
 
       // Prepare donor data
       const donorData = {
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        phone: formData.phone.trim(),
-        age: parseInt(formData.age),
+        name: (formData.name || '').trim(),
+        email: (formData.email || '').trim(),
+        phone: (formData.phone || '').trim(),
+        age: parseInt(formData.age, 10),
         blood_type: formData.blood_type || null,
-        district: formData.district,
-        city: formData.city.trim(),
+        district: formData.district || null,
+        city: (formData.city || '').trim(),
         last_donation_date: formData.last_donation_date || null,
         profile_picture: profilePictureUrl,
         created_at: new Date().toISOString(),
       };
 
       console.log('Starting registration process...');
-      
+
       // Create user account and donor profile
-      await signUp(formData.email, formData.password, donorData);
+      const signupResult = await signUp(formData.email, formData.password, donorData);
+      // support both thrown errors and returned { error }
+      if (signupResult && signupResult.error) {
+        throw signupResult.error;
+      }
 
       setSuccess('Registration successful! You are now logged in.');
-      
+
       // Reset form
       setFormData({
         name: '',
@@ -150,9 +179,9 @@ const Register = () => {
       });
       setProfilePicture(null);
 
-    } catch (error) {
-      console.error('Registration error:', error);
-      setError(`Registration failed: ${error.message || 'Unknown error'}`);
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError(`Registration failed: ${err?.message || String(err) || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -191,7 +220,7 @@ const Register = () => {
             <div className="w-24 h-24 rounded-full bg-gray-200 border-4 border-red-100 flex items-center justify-center text-gray-500 text-2xl font-bold overflow-hidden">
               {profilePicture ? (
                 <img
-                  src={URL.createObjectURL(profilePicture)}
+                  src={previewUrl || ''}
                   alt="Preview"
                   className="w-full h-full object-cover"
                 />
