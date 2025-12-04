@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Heart,Droplet, User, LogIn, UserPlus, Shield, LogOut, Edit, Users } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Heart, Droplet, User, LogIn, UserPlus, Shield, LogOut, Edit, Users } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import AuthModal from './AuthModal'
@@ -9,9 +9,30 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
   const [showDropdown, setShowDropdown] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showAdminModal, setShowAdminModal] = useState(false)
+  const [isAdminUser, setIsAdminUser] = useState(false) // New state
 
   const { user, isAdmin, signOut } = useAuth()
   const location = useLocation()
+
+  // Check if user is admin (from localStorage or context)
+  useEffect(() => {
+    const checkAdminSession = () => {
+      const adminSession = localStorage.getItem('admin_session')
+      setIsAdminUser(!!adminSession || isAdmin)
+    }
+    
+    checkAdminSession()
+    
+    // Listen for storage changes (if admin logs in from another tab)
+    const handleStorageChange = (e) => {
+      if (e.key === 'admin_session') {
+        checkAdminSession()
+      }
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [isAdmin])
 
   // Active tab detection based on URL
   const activeTab = location.pathname === '/donors' ? 'donors' : 'register'
@@ -20,6 +41,7 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
     try {
       await signOut()
       setShowDropdown(false)
+      setIsAdminUser(false)
     } catch (error) {
       console.error('Error signing out:', error)
     }
@@ -28,6 +50,28 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
   const handleEditProfile = () => {
     setShowDropdown(false)
     alert('Edit profile feature coming soon...')
+  }
+
+  // Get display name
+  const getDisplayName = () => {
+    if (isAdminUser && user) {
+      return user.user_metadata?.name || 'Admin'
+    }
+    if (user) {
+      return user.email?.split('@')[0] || 'User'
+    }
+    return 'Account'
+  }
+
+  // Get user role text
+  const getUserRole = () => {
+    if (isAdminUser) {
+      return 'Administrator'
+    }
+    if (user) {
+      return 'Blood Donor'
+    }
+    return ''
   }
 
   return (
@@ -48,8 +92,8 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
           </div>
 
           <div className="flex items-center gap-4">
-
-            {!user && (
+            {/* Show Admin Login button when NOT logged in as admin */}
+            {!isAdminUser && (
               <button
                 onClick={() => setShowAdminModal(true)}
                 className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full backdrop-blur-sm hover:bg-white/30 transition-all"
@@ -68,13 +112,18 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
                   <User className="w-4 h-4" />
                 </div>
                 <span className="font-medium">
-                  {user ? user.email.split('@')[0] : 'Account'}
+                  {getDisplayName()}
                 </span>
+                {isAdminUser && (
+                  <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                    Admin
+                  </span>
+                )}
               </button>
 
               {showDropdown && (
                 <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-lg shadow-lg py-2 z-50 border border-gray-200">
-                  {!user ? (
+                  {!user && !isAdminUser ? (
                     <>
                       <button
                         onClick={() => {
@@ -107,10 +156,17 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
                   ) : (
                     <>
                       <div className="px-4 py-3 border-b border-gray-100">
-                        <div className="font-medium text-gray-800">{user.email}</div>
+                        <div className="font-medium text-gray-800">
+                          {isAdminUser ? 'Administrator' : user?.email}
+                        </div>
                         <div className="text-sm text-gray-500 flex items-center gap-1">
                           <User className="w-3 h-3" />
-                          {isAdmin ? 'Administrator' : 'Blood Donor'}
+                          {getUserRole()}
+                          {isAdminUser && (
+                            <span className="ml-2 bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded">
+                              ✓ Verified
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -119,10 +175,10 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
                         className="w-full text-left px-4 py-3 hover:bg-gray-100 flex items-center gap-3 text-gray-700"
                       >
                         <Edit className="w-4 h-4" />
-                        Edit Profile
+                        {isAdminUser ? 'Admin Settings' : 'Edit Profile'}
                       </button>
 
-                      {isAdmin && (
+                      {isAdminUser && (
                         <button
                           onClick={() => {
                             onEditHero()
@@ -131,7 +187,7 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
                           className="w-full text-left px-4 py-3 hover:bg-gray-100 flex items-center gap-3 text-gray-700 border-t border-gray-100"
                         >
                           <Shield className="w-4 h-4" />
-                          Admin Settings
+                          System Settings
                         </button>
                       )}
 
@@ -140,7 +196,7 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
                         className="w-full text-left px-4 py-3 hover:bg-gray-100 flex items-center gap-3 text-red-600 border-t border-gray-100"
                       >
                         <LogOut className="w-4 h-4" />
-                        Logout
+                        {isAdminUser ? 'Logout Admin' : 'Logout'}
                       </button>
                     </>
                   )}
@@ -155,7 +211,7 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
           <p className="text-xl opacity-90 max-w-2xl mx-auto leading-relaxed bangla">
             {heroText}
           </p>
-          {isAdmin && (
+          {isAdminUser && (
             <button
               onClick={onEditHero}
               className="absolute right-6 top-0 bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-sm backdrop-blur-sm transition-all"
@@ -168,7 +224,6 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
 
         {/* Tabs */}
         <div className="flex bg-white">
-          
           <Link
             to="/register"
             className={`flex-1 py-4 text-center font-semibold flex items-center justify-center gap-2 transition-all ${
@@ -195,7 +250,6 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
               {donorsCount || 1}
             </span>
           </Link>
-
         </div>
       </div>
 
