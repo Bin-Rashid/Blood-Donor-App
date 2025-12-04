@@ -1,19 +1,34 @@
 // src/App.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import { DonorProvider } from './context/DonorContext';
 import { useAuth } from './context/AuthContext';
 import { useDonors } from './context/DonorContext';
 
 import Header from './components/Header';
-import Footer from './components/Footer'; // ✅ এই import টি চেক করুন
+import Footer from './components/Footer';
 import Register from './pages/Register';
 import Donors from './pages/Donors';
 import ResetPassword from './pages/ResetPassword';
-import AdminModal from './components/AdminModal';
-import GuidelinesPopup from './components/GuidelinesPopup'; // নতুন কম্পোনেন্ট
+import AdminLoginModal from './components/AdminLoginModal'; // Add this import
+import AdminLayout from './components/admin/AdminLayout'; // Add this import
+import AdminDashboard from './pages/AdminDashboard'; // Add this import
+import GuidelinesPopup from './components/GuidelinesPopup';
 
 import { supabase } from './services/supabase';
 import './index.css';
+
+// Protected Admin Route Component
+const ProtectedAdminRoute = ({ children }) => {
+  const { isAdmin, adminUser } = useAuth();
+  
+  if (!isAdmin || !adminUser) {
+    return <Navigate to="/" replace />;
+  }
+  
+  return children;
+};
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -29,13 +44,13 @@ function AppContent() {
   const [heroSettings, setHeroSettings] = useState({
     text: 'Connecting blood donors with those in need. Your single donation can save up to three lives.',
     whatsapp_number: '+880XXXXXXXXX',
-    instructions_text: 'জীবন বাঁচাতে রক্তদান করুন', // আপডেট করা
+    instructions_text: 'জীবন বাঁচাতে রক্তদান করুন',
   });
-  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [showAdminLoginModal, setShowAdminLoginModal] = useState(false); // Renamed
   const [showGuidelinesPopup, setShowGuidelinesPopup] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const { isAdmin } = useAuth();
+  const { user, isAdmin, adminUser, signOut, fullSignOut } = useAuth();
   const { donors, loading: donorsLoading } = useDonors();
 
   useEffect(() => {
@@ -46,7 +61,9 @@ function AppContent() {
         // Guidelines popup check
         const hasSeenGuidelines = localStorage.getItem('hasSeenGuidelines');
         if (!hasSeenGuidelines) {
-          setShowGuidelinesPopup(true);
+          setTimeout(() => {
+            setShowGuidelinesPopup(true);
+          }, 1000);
         }
       } catch (error) {
         console.error('Error initializing app:', error);
@@ -81,8 +98,12 @@ function AppContent() {
   }, []);
 
   const handleEditHero = () => {
-    if (isAdmin) {
-      setShowAdminModal(true);
+    // Show admin login modal if not admin
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+    } else {
+      // If already admin, you can directly open settings or show a toast
+      alert('You are already logged in as admin. Navigate to admin panel for settings.');
     }
   };
 
@@ -91,38 +112,20 @@ function AppContent() {
     setShowGuidelinesPopup(false);
   };
 
-  const updateHeroSettings = async (newSettings) => {
+  // Handle logout
+  const handleLogout = async () => {
     try {
-      const { data: existingData } = await supabase
-        .from('hero_settings')
-        .select('id')
-        .single();
-
-      let error;
-
-      if (existingData?.id) {
-        const { error: updateError } = await supabase
-          .from('hero_settings')
-          .update(newSettings)
-          .eq('id', existingData.id);
-
-        error = updateError;
-      } else {
-        const { error: insertError } = await supabase
-          .from('hero_settings')
-          .insert([newSettings]);
-
-        error = insertError;
+      if (isAdmin && adminUser) {
+        // If admin is logged in, do full logout
+        await fullSignOut?.();
+      } else if (user) {
+        // If regular user is logged in
+        await signOut?.();
+        window.location.href = '/'; // Redirect to home
       }
-
-      if (error) throw error;
-
-      setHeroSettings(newSettings);
-      setShowAdminModal(false);
-      alert('Settings updated successfully!');
     } catch (error) {
-      console.error('Error updating hero settings:', error);
-      alert('Failed to update settings: ' + error.message);
+      console.error('Logout error:', error);
+      alert('Error during logout. Please try again.');
     }
   };
 
@@ -137,6 +140,10 @@ function AppContent() {
           heroText={heroSettings.text}
           onEditHero={handleEditHero}
           donorsCount={donors.length}
+          isAdmin={isAdmin}
+          user={user}
+          adminUser={adminUser}
+          onLogout={handleLogout}
         />
 
         <main className="flex-1">
@@ -145,6 +152,17 @@ function AppContent() {
             <Route path="/register" element={<Register />} />
             <Route path="/donors" element={<Donors />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            
+            {/* Admin Routes */}
+            <Route path="/admin" element={
+              <ProtectedAdminRoute>
+                <AdminLayout />
+              </ProtectedAdminRoute>
+            }>
+              <Route index element={<AdminDashboard />} />
+              {/* Add more admin routes as needed */}
+              <Route path="dashboard" element={<AdminDashboard />} />
+            </Route>
           </Routes>
         </main>
 
@@ -153,14 +171,11 @@ function AppContent() {
           instructions={heroSettings.instructions_text}
         />
 
-        {isAdmin && (
-          <AdminModal
-            isOpen={showAdminModal}
-            onClose={() => setShowAdminModal(false)}
-            settings={heroSettings}
-            onSave={updateHeroSettings}
-          />
-        )}
+        {/* Admin Login Modal */}
+        <AdminLoginModal 
+          isOpen={showAdminLoginModal}
+          onClose={() => setShowAdminLoginModal(false)}
+        />
 
         <GuidelinesPopup 
           isOpen={showGuidelinesPopup}
@@ -179,7 +194,11 @@ function App() {
         v7_relativeSplatPath: true,
       }}
     >
-      <AppContent />
+      <AuthProvider>
+        <DonorProvider>
+          <AppContent />
+        </DonorProvider>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

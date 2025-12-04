@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { X, Shield, Mail, Lock, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
 import { supabase } from '../services/supabase'
+import { useAuth } from '../context/AuthContext' // Add this import
 
 const AdminLoginModal = ({ isOpen, onClose }) => {
+  const { setAdminUser } = useAuth(); // This should work now
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -49,35 +51,21 @@ const AdminLoginModal = ({ isOpen, onClose }) => {
           throw new Error('Invalid admin data received from server')
         }
 
-        // Create admin session
-        const adminSession = {
-          id: admin.id,
-          email: admin.email,
-          name: admin.name || 'Administrator',
-          role: 'admin',
-          loggedInAt: new Date().toISOString()
-        }
-        
-        console.log('Setting admin session:', adminSession)
-        
-        // Store in localStorage
         try {
-          localStorage.setItem('adminUser', JSON.stringify(adminSession))
-          localStorage.setItem('isAdmin', 'true')
-          localStorage.setItem('adminToken', Math.random().toString(36).substring(2))
-        } catch (storageErr) {
-          console.warn('LocalStorage error:', storageErr)
-          // Continue anyway - session just won't persist
+          // Use the context function to set admin user
+          setAdminUser(admin);
+          setSuccess(true);
+          
+          // Redirect to admin dashboard after a short delay
+          setTimeout(() => {
+            onClose?.();
+            window.location.href = '/admin'; // Redirect to admin panel
+          }, 800);
+          
+        } catch (setAdminError) {
+          console.error('Error setting admin user:', setAdminError);
+          throw new Error('Failed to set admin session');
         }
-
-        setSuccess(true)
-        
-        // Short delay to show success message, then reload
-        setTimeout(() => {
-          onClose?.()
-          // Refresh the page to update auth state everywhere
-          window.location.reload()
-        }, 800)
 
       } else {
         console.log('No admin data returned - invalid credentials')
@@ -97,8 +85,9 @@ const AdminLoginModal = ({ isOpen, onClose }) => {
       
       if (err.message.includes('Invalid email or password') || 
           err.message.includes('Invalid admin data') ||
-          err.message.includes('Invalid login credentials')) {
-        errorMessage = 'Invalid email or password'
+          err.message.includes('Invalid login credentials') ||
+          err.message.includes('Failed to set admin session')) {
+        errorMessage = err.message
       } else if (err.message.includes('timeout')) {
         errorMessage = 'Connection timeout. Please try again.'
       } else if (err.message.includes('network')) {

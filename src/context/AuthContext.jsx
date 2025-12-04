@@ -4,19 +4,38 @@ import { supabase } from '../services/supabase';
 // Helper function to check admin status from localStorage
 const checkAdminStatus = () => {
   try {
-    const isAdmin = localStorage.getItem('isAdmin')
-    const adminUser = localStorage.getItem('adminUser')
+    const isAdmin = localStorage.getItem('isAdmin');
+    const adminUser = localStorage.getItem('adminUser');
     
     if (isAdmin === 'true' && adminUser) {
-      const parsedUser = JSON.parse(adminUser)
-      return parsedUser
+      const parsedUser = JSON.parse(adminUser);
+      
+      // Check if session is less than 24 hours old
+      if (parsedUser.loggedInAt) {
+        const loginTime = new Date(parsedUser.loggedInAt).getTime();
+        const currentTime = new Date().getTime();
+        const twentyFourHours = 24 * 60 * 60 * 1000;
+        
+        if (currentTime - loginTime < twentyFourHours) {
+          return parsedUser;
+        }
+      }
     }
-    return null
+    
+    // Clear expired session
+    localStorage.removeItem('isAdmin');
+    localStorage.removeItem('adminUser');
+    localStorage.removeItem('adminToken');
+    return null;
   } catch (err) {
-    console.warn('Error checking admin status:', err)
-    return null
+    console.warn('Error checking admin status:', err);
+    // Clear on error
+    localStorage.removeItem('isAdmin');
+    localStorage.removeItem('adminUser');
+    localStorage.removeItem('adminToken');
+    return null;
   }
-}
+};
 
 const AuthContext = createContext({
   user: null,
@@ -27,21 +46,15 @@ const AuthContext = createContext({
   signIn: async () => ({}),
   signOut: async () => ({}),
   adminSignOut: async () => ({}),
+  fullSignOut: async () => ({}),
+  setAdminUser: () => {},
 });
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
-  const [adminUser, setAdminUser] = useState(() => checkAdminStatus()) // Initialize from localStorage
-  const [loading, setLoading] = useState(true)
-  const [initialised, setInitialised] = useState(false)
-
-  // Load admin status from localStorage on mount
-  useEffect(() => {
-    const admin = checkAdminStatus();
-    if (admin) {
-      setAdminUser(admin);
-    }
-  }, []);
+  const [user, setUser] = useState(null);
+  const [adminUser, setAdminUser] = useState(() => checkAdminStatus());
+  const [loading, setLoading] = useState(true);
+  const [initialised, setInitialised] = useState(false);
 
   // Main auth effect
   useEffect(() => {
@@ -71,7 +84,7 @@ export const AuthProvider = ({ children }) => {
         listener = supabase.auth.onAuthStateChange((event, session) => {
           try {
             if (!mounted) return;
-            console.log('Auth state changed:', event, session?.user?.email);
+            console.log('Auth state changed:', event);
             setUser(session?.user ?? null);
           } catch (err) {
             console.warn('Error handling auth state change', err);
@@ -146,7 +159,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // Regular sign out (for regular users)
+  // Regular user sign out
   const signOut = useCallback(async () => {
     try {
       if (!supabase || !supabase.auth) {
@@ -165,71 +178,112 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // Admin sign out
+  // Admin sign out - clears admin session ONLY
   const adminSignOut = useCallback(async () => {
+    console.log('Admin sign out called');
+    
     try {
+      // Clear all admin-related localStorage items
       localStorage.removeItem('isAdmin');
       localStorage.removeItem('adminUser');
       localStorage.removeItem('adminToken');
+      
+      // Update state
       setAdminUser(null);
       
-      // Also sign out from regular auth if logged in
+      console.log('Admin session cleared');
+      return { error: null };
+    } catch (err) {
+      console.error('Admin sign out error:', err);
+      return { error: err };
+    }
+  }, []);
+
+  // Combined sign out - clears both admin and regular user sessions
+  const fullSignOut = useCallback(async () => {
+    console.log('Full sign out called');
+    
+    try {
+      // Clear admin session from localStorage
+      localStorage.removeItem('isAdmin');
+      localStorage.removeItem('adminUser');
+      localStorage.removeItem('adminToken');
+      
+      // Update admin user state
+      setAdminUser(null);
+      
+      // Clear regular user session if exists
       if (user) {
         await supabase.auth.signOut();
         setUser(null);
       }
       
+      // Force a page reload to reset all states
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 100);
+      
       return { error: null };
     } catch (err) {
-      console.error('Admin sign out error:', err);
+      console.error('Full sign out error:', err);
       return { error: err };
     }
   }, [user]);
 
   // Set admin user (called from AdminLoginModal after successful login)
   const setAdminUserContext = useCallback((adminData) => {
+    console.log('Setting admin user context:', adminData);
+    
     try {
       const adminSession = {
         id: adminData.id,
         email: adminData.email,
-        name: adminData.name || 'Administrator',
+        name: adminData.name || adminData.email.split('@')[0],
         role: 'admin',
         loggedInAt: new Date().toISOString()
-      }
+      };
       
-      localStorage.setItem('adminUser', JSON.stringify(adminSession))
-      localStorage.setItem('isAdmin', 'true')
-      localStorage.setItem('adminToken', Math.random().toString(36).substring(2))
+      // Generate a simple session token
+      const token = Math.random().toString(36).substring(2) + 
+                   Date.now().toString(36);
       
-      setAdminUser(adminSession)
+      localStorage.setItem('adminUser', JSON.stringify(adminSession));
+      localStorage.setItem('isAdmin', 'true');
+      localStorage.setItem('adminToken', token);
+      
+      setAdminUser(adminSession);
+      
+      console.log('Admin session set successfully');
+      return { success: true, adminSession };
     } catch (err) {
-      console.error('Error setting admin user:', err)
+      console.error('Error setting admin user:', err);
+      throw err;
     }
-  }, [])
+  }, []);
 
   // Derive isAdmin from both sources
   const isAdmin = useMemo(() => {
     try {
       // Check localStorage admin first
       if (adminUser) {
-        return true
+        return true;
       }
       
       // Check Supabase user metadata
-      if (!user) return false
+      if (!user) return false;
       
       const role = user?.app_metadata?.role ?? 
                    user?.user_metadata?.role ?? 
-                   user?.user_metadata?.is_admin
+                   user?.user_metadata?.is_admin;
       
-      if (role === true || role === 'true') return true
-      if (typeof role === 'string' && role.toLowerCase() === 'admin') return true
+      if (role === true || role === 'true') return true;
+      if (typeof role === 'string' && role.toLowerCase() === 'admin') return true;
       
-      return false
+      return false;
     } catch (err) {
-      return false
+      return false;
     }
-  }, [user, adminUser])
+  }, [user, adminUser]);
 
   // Combined user object (prefers admin user if exists)
   const currentUser = useMemo(() => {
@@ -251,20 +305,16 @@ export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider 
       value={{ 
-        user: adminUser || user, // Prefer admin user if exists
+        user: currentUser,
         loading, 
         isAdmin, 
         adminUser,
         signUp, 
         signIn, 
         signOut,
-        setAdminUser: setAdminUserContext, // Add this
-        adminSignOut: () => {
-          localStorage.removeItem('isAdmin')
-          localStorage.removeItem('adminUser')
-          localStorage.removeItem('adminToken')
-          setAdminUser(null)
-        }
+        adminSignOut,
+        fullSignOut,
+        setAdminUser: setAdminUserContext
       }}
     >
       {children}
