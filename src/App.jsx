@@ -10,6 +10,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import Register from './pages/Register';
 import Donors from './pages/Donors';
+import Profile from './pages/Profile'; // Added Profile import
 import ResetPassword from './pages/ResetPassword';
 import AdminLoginModal from './components/AdminLoginModal';
 import AdminLayout from './components/admin/AdminLayout';
@@ -24,6 +25,17 @@ const ProtectedAdminRoute = ({ children }) => {
   const { isAdmin, adminUser } = useAuth();
   
   if (!isAdmin || !adminUser) {
+    return <Navigate to="/" replace />;
+  }
+  
+  return children;
+};
+
+// Protected Donor Route Component (for Profile page)
+const ProtectedDonorRoute = ({ children }) => {
+  const { user, isAdmin } = useAuth();
+  
+  if (!user || isAdmin) {
     return <Navigate to="/" replace />;
   }
   
@@ -56,44 +68,44 @@ function FrontendLayout() {
   const { donors, loading: donorsLoading } = useDonors();
 
   useEffect(() => {
-  const initializeApp = async () => {
-    try {
-      await fetchHeroSettings();
-      
-      // Guidelines popup check
-      const hasSeenGuidelines = localStorage.getItem('hasSeenGuidelines');
-      if (!hasSeenGuidelines) {
-        setTimeout(() => {
-          setShowGuidelinesPopup(true);
-        }, 1000);
-      }
-      
-      // Listen for storage events (for cross-tab communication)
-      const handleStorageChange = (event) => {
-        if (event.key === 'lastRegisteredDonor') {
-          console.log('🔄 Storage event: New donor registered in another tab');
-          // Trigger a refresh if on donors page
-          if (window.location.pathname.includes('/donors')) {
-            window.dispatchEvent(new Event('refreshDonors'));
-          }
+    const initializeApp = async () => {
+      try {
+        await fetchHeroSettings();
+        
+        // Guidelines popup check
+        const hasSeenGuidelines = localStorage.getItem('hasSeenGuidelines');
+        if (!hasSeenGuidelines) {
+          setTimeout(() => {
+            setShowGuidelinesPopup(true);
+          }, 1000);
         }
-      };
-      
-      window.addEventListener('storage', handleStorageChange);
-      
-      // Cleanup
-      return () => {
-        window.removeEventListener('storage', handleStorageChange);
-      };
-    } catch (error) {
-      console.error('Error initializing app:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        
+        // Listen for storage events (for cross-tab communication)
+        const handleStorageChange = (event) => {
+          if (event.key === 'lastRegisteredDonor') {
+            console.log('🔄 Storage event: New donor registered in another tab');
+            // Trigger a refresh if on donors page
+            if (window.location.pathname.includes('/donors')) {
+              window.dispatchEvent(new Event('refreshDonors'));
+            }
+          }
+        };
+        
+        window.addEventListener('storage', handleStorageChange);
+        
+        // Cleanup
+        return () => {
+          window.removeEventListener('storage', handleStorageChange);
+        };
+      } catch (error) {
+        console.error('Error initializing app:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  initializeApp();
-}, []);
+    initializeApp();
+  }, []);
 
   const fetchHeroSettings = useCallback(async () => {
     try {
@@ -170,6 +182,12 @@ function FrontendLayout() {
             <Route path="/" element={<Register />} />
             <Route path="/register" element={<Register />} />
             <Route path="/donors" element={<Donors />} />
+            {/* Add Profile route with protected route */}
+            <Route path="/profile" element={
+              <ProtectedDonorRoute>
+                <Profile />
+              </ProtectedDonorRoute>
+            } />
             <Route path="/reset-password" element={<ResetPassword />} />
           </Routes>
         </main>

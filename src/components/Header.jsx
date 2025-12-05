@@ -34,7 +34,11 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
 
   const handleEditProfile = () => {
     setShowDropdown(false);
-    alert('Edit profile feature coming soon...');
+    if (user && !isAdmin) {
+      navigate('/profile'); // Navigate to profile page for donors
+    } else if (isAdmin) {
+      alert('Admin profile editing coming soon...');
+    }
   }
 
   const handleGoToAdminPanel = () => {
