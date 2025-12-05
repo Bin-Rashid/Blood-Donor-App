@@ -78,7 +78,7 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
         <div className="px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <Droplet className="w-8 h-8" fill="white" />
-            <h1 className="text-2xl font-bold">LifeShare @ Sadaqah</h1>
+            <h1 className="text-2xl font-bold">LifeShare</h1>
           </div>
 
           <div className="flex items-center gap-4">
