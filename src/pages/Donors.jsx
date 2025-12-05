@@ -14,9 +14,9 @@ const Donors = () => {
   const { isAdmin, user, signOut } = useAuth()
   const [donors, setDonors] = useState([])
   const [filteredDonors, setFilteredDonors] = useState([])
-  const [displayedDonors, setDisplayedDonors] = useState([]) // New state for pagination
+  const [displayedDonors, setDisplayedDonors] = useState([])
   const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false) // New loading state for load more
+  const [loadingMore, setLoadingMore] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(null)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [phoneRequestModalOpen, setPhoneRequestModalOpen] = useState(false)
@@ -30,9 +30,9 @@ const Donors = () => {
   })
 
   // Pagination settings
-  const [pageSize, setPageSize] = useState(20) // Items per page
-  const [currentPage, setCurrentPage] = useState(1) // Current page number
-  const [totalPages, setTotalPages] = useState(1) // Total pages
+  const [pageSize, setPageSize] = useState(20)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
 
   // Track which donors' phone numbers are visible
   const [visiblePhones, setVisiblePhones] = useState(() => {
@@ -74,27 +74,75 @@ const Donors = () => {
     }
   }, [filteredDonors, currentPage, activeSubTab])
 
+  // Initial fetch when tab changes to find-donors
   useEffect(() => {
     if (!hasFetched.current && activeSubTab === 'find-donors') {
+      console.log('🔍 Initial fetch for find-donors tab')
       hasFetched.current = true
       fetchDonors()
     }
   }, [activeSubTab])
 
+  // Filter and sort donors when filters change
   useEffect(() => {
-    if (activeSubTab === 'find-donors') {
+    if (activeSubTab === 'find-donors' && donors.length > 0) {
+      console.log('🔍 Applying filters to', donors.length, 'donors')
       filterAndSortDonors()
     }
-  }, [donors, filters, activeSubTab])
+  }, [filters, donors, activeSubTab])
+
+  // Listen for new donor registration
+  useEffect(() => {
+    const handleNewDonorRegistered = () => {
+      console.log('🎯 Event received: New donor registered')
+      // Wait a bit to ensure data is saved in database
+      setTimeout(() => {
+        fetchDonors()
+      }, 1000)
+    }
+
+    // Listen for custom event
+    window.addEventListener('newDonorRegistered', handleNewDonorRegistered)
+    
+    // Listen for storage events (cross-tab)
+    const handleStorageChange = (event) => {
+      if (event.key === 'lastRegisteredDonor') {
+        console.log('🔄 Storage change detected: New donor')
+        fetchDonors()
+      }
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    
+    // Check on mount if there's a new donor flag
+    const checkForNewDonor = () => {
+      const flag = sessionStorage.getItem('newDonorRegistered')
+      const lastDonor = localStorage.getItem('lastRegisteredDonor')
+      
+      if (flag === 'true' || lastDonor) {
+        console.log('📌 New donor flag found, refreshing...')
+        fetchDonors()
+        sessionStorage.removeItem('newDonorRegistered')
+      }
+    }
+    
+    // Small delay to ensure everything is loaded
+    setTimeout(checkForNewDonor, 1500)
+
+    return () => {
+      window.removeEventListener('newDonorRegistered', handleNewDonorRegistered)
+      window.removeEventListener('storage', handleStorageChange)
+    }
+  }, [])
 
   const fetchDonors = async () => {
     try {
-      console.log('🔄 Fetching donors from database...')
+      console.log('🔄 Fetching donors from Supabase...')
       setLoading(true)
       
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from('donors')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -102,13 +150,19 @@ const Donors = () => {
         throw error
       }
 
-      console.log('✅ Donors fetched successfully:', data?.length || 0)
+      console.log('✅ Donors fetched successfully:', data?.length || 0, 'donors')
+      console.log('Sample donor data:', data?.[0])
+      
       setDonors(data || [])
       calculateStats(data || [])
+      
+      // Apply filters immediately
+      filterAndSortDonors()
       
     } catch (error) {
       console.error('❌ Error in fetchDonors:', error)
       setDonors([])
+      setFilteredDonors([])
     } finally {
       console.log('✅ Setting loading to false')
       setLoading(false)
@@ -148,6 +202,105 @@ const Donors = () => {
     }
   }
 
+  const filterAndSortDonors = () => {
+    try {
+      console.log('🔍 Starting filterAndSortDonors with', donors.length, 'donors')
+      
+      let filtered = [...donors]
+
+      // Apply filters
+      if (filters.search) {
+        console.log('Applying search filter:', filters.search)
+        filtered = filtered.filter(donor =>
+          donor.name?.toLowerCase().includes(filters.search.toLowerCase()) ||
+          donor.phone?.includes(filters.search) ||
+          donor.email?.toLowerCase().includes(filters.search.toLowerCase())
+        )
+      }
+
+      if (filters.bloodType) {
+        console.log('Applying blood type filter:', filters.bloodType)
+        filtered = filtered.filter(donor => donor.blood_type === filters.bloodType)
+      }
+
+      if (filters.district) {
+        console.log('Applying district filter:', filters.district)
+        filtered = filtered.filter(donor => donor.district === filters.district)
+      }
+
+      if (filters.city) {
+        console.log('Applying city filter:', filters.city)
+        filtered = filtered.filter(donor =>
+          donor.city?.toLowerCase().includes(filters.city.toLowerCase())
+        )
+      }
+
+      if (filters.status) {
+        console.log('Applying status filter:', filters.status)
+        const today = new Date()
+        const threeMonthsAgo = new Date()
+        threeMonthsAgo.setMonth(today.getMonth() - 3)
+
+        if (filters.status === 'eligible') {
+          filtered = filtered.filter(donor => {
+            if (!donor.last_donation_date) return true
+            return new Date(donor.last_donation_date) <= threeMonthsAgo
+          })
+        } else if (filters.status === 'not-eligible') {
+          filtered = filtered.filter(donor => {
+            if (!donor.last_donation_date) return false
+            return new Date(donor.last_donation_date) > threeMonthsAgo
+          })
+        }
+      }
+
+      // Apply sorting
+      console.log('Applying sort:', filters.sortBy)
+      filtered.sort((a, b) => {
+        switch (filters.sortBy) {
+          case 'name-asc':
+            return (a.name || '').localeCompare(b.name || '')
+          case 'name-desc':
+            return (b.name || '').localeCompare(a.name || '')
+          case 'age-asc':
+            return (a.age || 0) - (b.age || 0)
+          case 'age-desc':
+            return (b.age || 0) - (a.age || 0)
+          case 'created_at-asc':
+            return new Date(a.created_at || 0) - new Date(b.created_at || 0)
+          case 'created_at-desc':
+            return new Date(b.created_at || 0) - new Date(a.created_at || 0)
+          default:
+            return 0
+        }
+      })
+
+      console.log('✅ Filtered to', filtered.length, 'donors')
+      setFilteredDonors(filtered)
+      
+      // Reset to first page when filters change
+      setCurrentPage(1)
+      
+    } catch (error) {
+      console.error('Error in filterAndSortDonors:', error)
+      setFilteredDonors(donors)
+    }
+  }
+
+  // Update displayed donors based on current page
+  const updateDisplayedDonors = () => {
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    const donorsToDisplay = filteredDonors.slice(0, endIndex)
+    
+    console.log('📄 Displaying donors', startIndex, 'to', endIndex, 'of', filteredDonors.length)
+    setDisplayedDonors(donorsToDisplay)
+    
+    // Calculate total pages
+    const calculatedTotalPages = Math.ceil(filteredDonors.length / pageSize)
+    setTotalPages(calculatedTotalPages)
+  }
+
   const handleDeleteDonor = async (donor) => {
     const canDelete = isAdmin || user?.id === donor.id;
     
@@ -176,14 +329,12 @@ const Donors = () => {
       // যদি user নিজের profile delete করে, তাহলে sign out করানো
       if (user?.id === donor.id) {
         console.log('User deleted own profile, signing out...')
-        // Sign out from Supabase
         await signOut()
-        // Force page reload to clear all cached state
         window.location.href = '/'
-        return // Stop further execution
+        return
       }
 
-      // Success - remove from local state (for admin deleting other profiles)
+      // Success - remove from local state
       setDonors(prev => prev.filter(d => d.id !== donor.id))
       
       // Also remove from visible phones
@@ -223,9 +374,8 @@ const Donors = () => {
   }
 
   const handleUpdateDonor = () => {
-    if (activeSubTab === 'find-donors') {
-      fetchDonors()
-    }
+    console.log('🔄 handleUpdateDonor called, refreshing donors list')
+    fetchDonors()
   }
 
   // Phone number request handler
@@ -236,40 +386,9 @@ const Donors = () => {
 
   // Handle phone request submission
   const handlePhoneRequestSubmit = async (requesterInfo) => {
-  if (!phoneRequestDonor) return;
+    if (!phoneRequestDonor) return;
 
-  // FIRST: Mark this donor's phone as visible
-  setVisiblePhones(prev => ({
-    ...prev,
-    [phoneRequestDonor.id]: {
-      phone: phoneRequestDonor.phone,
-      revealedAt: new Date().toISOString()
-    }
-  }));
-
-  // SECOND: Send to WhatsApp WITHOUT donor phone number
-  const whatsappMessage = encodeURIComponent(
-    `📞 *New Phone Number Request*\n\n` +
-    `*Donor Info:*\n` +
-    `Name: ${phoneRequestDonor.name}\n` +
-    `Blood Type: ${phoneRequestDonor.blood_type || 'Unknown'}\n` +
-    `Location: ${phoneRequestDonor.district || ''}${phoneRequestDonor.city ? ', ' + phoneRequestDonor.city : ''}\n\n` +
-    `*Requester Info:*\n` +
-    `Name: ${requesterInfo.name}\n` +
-    `Phone: ${requesterInfo.phone}\n` +
-    `Address: ${requesterInfo.address}\n` +
-    `Patient Problem: ${requesterInfo.patientProblem}\n\n` +
-    `---\n` +
-    `Requested at: ${new Date().toLocaleString()}`
-  );
-  
-  // Use your WhatsApp number here
-  const whatsappNumber = "+8801959601901"; // Replace with your actual WhatsApp number
-  
-  // Open WhatsApp in new tab
-  window.open(`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`, '_blank');
-  
-  // Mark this donor's phone as visible
+    // FIRST: Mark this donor's phone as visible
     setVisiblePhones(prev => ({
       ...prev,
       [phoneRequestDonor.id]: {
@@ -277,9 +396,28 @@ const Donors = () => {
         revealedAt: new Date().toISOString()
       }
     }));
+
+    // SECOND: Send to WhatsApp WITHOUT donor phone number
+    const whatsappMessage = encodeURIComponent(
+      `📞 *New Phone Number Request*\n\n` +
+      `*Donor Info:*\n` +
+      `Name: ${phoneRequestDonor.name}\n` +
+      `Blood Type: ${phoneRequestDonor.blood_type || 'Unknown'}\n` +
+      `Location: ${phoneRequestDonor.district || ''}${phoneRequestDonor.city ? ', ' + phoneRequestDonor.city : ''}\n\n` +
+      `*Requester Info:*\n` +
+      `Name: ${requesterInfo.name}\n` +
+      `Phone: ${requesterInfo.phone}\n` +
+      `Address: ${requesterInfo.address}\n` +
+      `Patient Problem: ${requesterInfo.patientProblem}\n\n` +
+      `---\n` +
+      `Requested at: ${new Date().toLocaleString()}`
+    );
     
-    // setPhoneRequestModalOpen(false)
-    // setPhoneRequestDonor(null)
+    const whatsappNumber = "+8801959601901";
+    window.open(`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`, '_blank');
+    
+    setPhoneRequestModalOpen(false)
+    setPhoneRequestDonor(null)
   }
 
   // Clear visible phones (admin function)
@@ -290,102 +428,11 @@ const Donors = () => {
     }
   }
 
-  const filterAndSortDonors = () => {
-    try {
-      let filtered = [...donors]
-
-      // Apply filterssetPhoneRequestModalOpen(false)
-      if (filters.search) {
-        filtered = filtered.filter(donor =>
-          donor.name?.toLowerCase().includes(filters.search.toLowerCase()) ||
-          donor.phone?.includes(filters.search) ||
-          donor.email?.toLowerCase().includes(filters.search.toLowerCase())
-        )
-      }
-
-      if (filters.bloodType) {
-        filtered = filtered.filter(donor => donor.blood_type === filters.bloodType)
-      }
-
-      if (filters.district) {
-        filtered = filtered.filter(donor => donor.district === filters.district)
-      }
-
-      if (filters.city) {
-        filtered = filtered.filter(donor =>
-          donor.city?.toLowerCase().includes(filters.city.toLowerCase())
-        )
-      }
-
-      if (filters.status) {
-        const today = new Date()
-        const threeMonthsAgo = new Date()
-        threeMonthsAgo.setMonth(today.getMonth() - 3)
-
-        if (filters.status === 'eligible') {
-          filtered = filtered.filter(donor => {
-            if (!donor.last_donation_date) return true
-            return new Date(donor.last_donation_date) <= threeMonthsAgo
-          })
-        } else if (filters.status === 'not-eligible') {
-          filtered = filtered.filter(donor => {
-            if (!donor.last_donation_date) return false
-            return new Date(donor.last_donation_date) > threeMonthsAgo
-          })
-        }
-      }
-
-      // Apply sorting
-      filtered.sort((a, b) => {
-        switch (filters.sortBy) {
-          case 'name-asc':
-            return (a.name || '').localeCompare(b.name || '')
-          case 'name-desc':
-            return (b.name || '').localeCompare(a.name || '')
-          case 'age-asc':
-            return (a.age || 0) - (b.age || 0)
-          case 'age-desc':
-            return (b.age || 0) - (a.age || 0)
-          case 'created_at-asc':
-            return new Date(a.created_at || 0) - new Date(b.created_at || 0)
-          case 'created_at-desc':
-            return new Date(b.created_at || 0) - new Date(a.created_at || 0)
-          default:
-            return 0
-        }
-      })
-
-      setFilteredDonors(filtered)
-      
-      // Reset to first page when filters change
-      setCurrentPage(1)
-      
-      console.log('🔍 Filtered donors:', filtered.length)
-    } catch (error) {
-      console.error('Error in filterAndSortDonors:', error)
-      setFilteredDonors(donors)
-    }
-  }
-
-  // Update displayed donors based on current page
-  const updateDisplayedDonors = () => {
-    const startIndex = (currentPage - 1) * pageSize
-    const endIndex = startIndex + pageSize
-    const donorsToDisplay = filteredDonors.slice(0, endIndex)
-    
-    setDisplayedDonors(donorsToDisplay)
-    
-    // Calculate total pages
-    const calculatedTotalPages = Math.ceil(filteredDonors.length / pageSize)
-    setTotalPages(calculatedTotalPages)
-  }
-
   // Load more donors
   const loadMoreDonors = () => {
     if (currentPage < totalPages) {
       setLoadingMore(true)
       
-      // Simulate loading delay
       setTimeout(() => {
         setCurrentPage(prev => prev + 1)
         setLoadingMore(false)
@@ -397,7 +444,6 @@ const Donors = () => {
   const loadAllDonors = () => {
     setLoadingMore(true)
     
-    // Simulate loading delay
     setTimeout(() => {
       const allPages = Math.ceil(filteredDonors.length / pageSize)
       setCurrentPage(allPages)
@@ -468,13 +514,15 @@ const Donors = () => {
   // Tab change handler
   const handleTabChange = (tab) => {
     setActiveSubTab(tab)
-    if (tab === 'find-donors' && !hasFetched.current) {
-      hasFetched.current = true
-      fetchDonors()
+    hasFetched.current = false
+    if (tab === 'find-donors') {
+      setTimeout(() => {
+        fetchDonors()
+      }, 100)
     }
   }
 
-  console.log('🎯 Donors component - active tab:', activeSubTab, 'loading:', loading, 'donors count:', donors.length)
+  console.log('🎯 Donors component - active tab:', activeSubTab, 'loading:', loading, 'donors count:', donors.length, 'filtered:', filteredDonors.length, 'displayed:', displayedDonors.length)
 
   const renderFindDonorsContent = () => {
     if (loading) {
@@ -483,6 +531,7 @@ const Donors = () => {
           <div className="text-center">
             <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2 text-red-600" />
             <p className="text-gray-600">Loading donors...</p>
+            <p className="text-gray-500 text-sm mt-2">Fetching data from database</p>
           </div>
         </div>
       )
@@ -522,6 +571,18 @@ const Donors = () => {
             </button>
           )}
         </div>
+
+        {/* Debug info - Remove in production */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-xs">
+            <div className="font-semibold text-blue-800">Debug Info:</div>
+            <div className="text-blue-700 grid grid-cols-3 gap-2 mt-1">
+              <div>Total Donors: {donors.length}</div>
+              <div>Filtered: {filteredDonors.length}</div>
+              <div>Displayed: {displayedDonors.length}</div>
+            </div>
+          </div>
+        )}
 
         {/* Stats about revealed phones */}
         {Object.keys(visiblePhones).length > 0 && (
@@ -647,12 +708,21 @@ const Donors = () => {
           <div className="text-center py-12">
             <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
             <h3 className="text-xl font-semibold text-gray-600 mb-2">No donors found</h3>
-            <p className="text-gray-500">
+            <p className="text-gray-500 mb-4">
               {donors.length === 0 
                 ? 'No donors have registered yet. Be the first to register!'
                 : 'Try adjusting your filters to see more results.'
               }
             </p>
+            {donors.length === 0 && (
+              <a 
+                href="/register" 
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <Users className="w-4 h-4" />
+                Be the First Donor
+              </a>
+            )}
             {donors.length > 0 && (
               <button onClick={clearFilters} className="btn-primary mt-4">
                 Clear All Filters

@@ -1,3 +1,4 @@
+// src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 
@@ -112,28 +113,102 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  // Sign up function
-  const signUp = useCallback(async (email, password, metadata = {}) => {
+  // Sign up function - COMPLETELY UPDATED
+  const signUp = useCallback(async (email, password, donorData) => {
     try {
+      console.log('🚀 Starting registration process...');
+      
       if (!supabase || !supabase.auth) {
         throw new Error('Auth client not available');
       }
 
-      const result = await supabase.auth.signUp({
-        email,
+      // Step 1: Create user in Supabase Auth
+      console.log('Creating auth user...');
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
         password,
         options: {
-          data: metadata
+          data: {
+            name: donorData.name,
+            phone: donorData.phone,
+            role: 'donor'
+          }
         }
       });
 
-      if (result?.error) {
-        return { error: result.error, data: result.data ?? null };
+      if (authError) {
+        console.error('❌ Auth error:', authError);
+        throw authError;
       }
 
-      return { data: result?.data ?? null, error: null };
+      console.log('✅ Auth successful, user created:', authData.user?.id);
+
+      // Step 2: Create donor profile in database
+      console.log('Creating donor profile...');
+      
+      const donorProfileData = {
+        id: authData.user.id, // Use auth user's ID as donor ID
+        name: donorData.name.trim(),
+        email: email.trim().toLowerCase(),
+        phone: donorData.phone.trim(),
+        age: parseInt(donorData.age, 10),
+        blood_type: donorData.blood_type || null,
+        district: donorData.district || null,
+        city: donorData.city ? donorData.city.trim() : '',
+        last_donation_date: donorData.last_donation_date || null,
+        profile_picture: donorData.profile_picture || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      console.log('Donor data to insert:', donorProfileData);
+
+      const { data: donorDataResult, error: donorError } = await supabase
+        .from('donors')
+        .insert([donorProfileData])
+        .select()
+        .single();
+
+      if (donorError) {
+        console.error('❌ Donor creation error:', donorError);
+        
+        // If donor creation fails, try to delete the auth user
+        try {
+          console.log('Cleaning up: deleting auth user...');
+          await supabase.auth.admin.deleteUser(authData.user.id);
+        } catch (deleteErr) {
+          console.error('Failed to delete auth user:', deleteErr);
+        }
+        
+        throw donorError;
+      }
+
+      console.log('✅ Donor profile created successfully:', donorDataResult);
+
+      // Step 3: Update local state
+      console.log('Updating local auth state...');
+      setUser(authData.user);
+      
+      // Step 4: Store in localStorage
+      localStorage.setItem('user', JSON.stringify(authData.user));
+      localStorage.setItem('session', JSON.stringify(authData.session));
+
+      // ✅ IMPORTANT: Return donor data so Register.jsx can use it
+      return { 
+        user: authData.user, 
+        donor: donorDataResult,
+        success: true 
+      };
+      
     } catch (err) {
-      return { error: err, data: null };
+      console.error('❌ Registration error:', err);
+      
+      // Return error in a format that can be handled
+      const errorMessage = err.message || err.toString() || 'Registration failed';
+      return { 
+        error: errorMessage,
+        success: false 
+      };
     }
   }, []);
 

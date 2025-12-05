@@ -56,26 +56,44 @@ function FrontendLayout() {
   const { donors, loading: donorsLoading } = useDonors();
 
   useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        await fetchHeroSettings();
-        
-        // Guidelines popup check
-        const hasSeenGuidelines = localStorage.getItem('hasSeenGuidelines');
-        if (!hasSeenGuidelines) {
-          setTimeout(() => {
-            setShowGuidelinesPopup(true);
-          }, 1000);
-        }
-      } catch (error) {
-        console.error('Error initializing app:', error);
-      } finally {
-        setLoading(false);
+  const initializeApp = async () => {
+    try {
+      await fetchHeroSettings();
+      
+      // Guidelines popup check
+      const hasSeenGuidelines = localStorage.getItem('hasSeenGuidelines');
+      if (!hasSeenGuidelines) {
+        setTimeout(() => {
+          setShowGuidelinesPopup(true);
+        }, 1000);
       }
-    };
+      
+      // Listen for storage events (for cross-tab communication)
+      const handleStorageChange = (event) => {
+        if (event.key === 'lastRegisteredDonor') {
+          console.log('🔄 Storage event: New donor registered in another tab');
+          // Trigger a refresh if on donors page
+          if (window.location.pathname.includes('/donors')) {
+            window.dispatchEvent(new Event('refreshDonors'));
+          }
+        }
+      };
+      
+      window.addEventListener('storage', handleStorageChange);
+      
+      // Cleanup
+      return () => {
+        window.removeEventListener('storage', handleStorageChange);
+      };
+    } catch (error) {
+      console.error('Error initializing app:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    initializeApp();
-  }, []);
+  initializeApp();
+}, []);
 
   const fetchHeroSettings = useCallback(async () => {
     try {

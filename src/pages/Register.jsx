@@ -1,11 +1,15 @@
+// src/pages/Register.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, Phone, Cake, Droplets, MapPin, Home, Calendar, Camera, Loader } from 'lucide-react';
 import { districts, bloodTypes } from '../utils/helpers';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useDonors } from '../context/DonorContext'; // ✅ DonorContext ইম্পোর্ট যোগ করুন
 
 const Register = () => {
   const { signUp } = useAuth();
+  const { addDonor } = useDonors(); // ✅ addDonor ফাংশন ইম্পোর্ট করুন
+  
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -100,92 +104,111 @@ const Register = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
+  e.preventDefault();
+  setLoading(true);
+  setError('');
+  setSuccess('');
 
-    try {
-      // Validate form
-      if (!validateForm()) {
-        setLoading(false);
-        return;
-      }
-
-      let profilePictureUrl = null;
-
-      // Upload profile picture if selected
-      if (profilePicture) {
-        try {
-          const fileExt = (profilePicture.name || '').split('.').pop();
-          const fileName = `${Math.random().toString(36).substring(2)}.${fileExt || 'jpg'}`;
-          
-          const uploadResult = await supabase.storage
-            .from('profile-pictures')
-            .upload(fileName, profilePicture);
-
-          // handle different supabase response shapes
-          const uploadError = uploadResult?.error ?? (uploadResult?.data?.error ?? null);
-          if (uploadError) throw uploadError;
-
-          const publicUrlResult = await supabase.storage
-            .from('profile-pictures')
-            .getPublicUrl(fileName);
-
-          // support different shapes: { data: { publicUrl } } or { publicUrl }
-          profilePictureUrl = publicUrlResult?.data?.publicUrl ?? publicUrlResult?.publicUrl ?? null;
-        } catch (uploadError) {
-          console.warn('Profile picture upload failed:', uploadError);
-          // Continue without profile picture
-        }
-      }
-
-      // Prepare donor data
-      const donorData = {
-        name: (formData.name || '').trim(),
-        email: (formData.email || '').trim(),
-        phone: (formData.phone || '').trim(),
-        age: parseInt(formData.age, 10),
-        blood_type: formData.blood_type || null,
-        district: formData.district || null,
-        city: (formData.city || '').trim(),
-        last_donation_date: formData.last_donation_date || null,
-        profile_picture: profilePictureUrl,
-        created_at: new Date().toISOString(),
-      };
-
-      console.log('Starting registration process...');
-
-      // Create user account and donor profile
-      const signupResult = await signUp(formData.email, formData.password, donorData);
-      // support both thrown errors and returned { error }
-      if (signupResult && signupResult.error) {
-        throw signupResult.error;
-      }
-
-      setSuccess('Registration successful! You are now logged in.');
-
-      // Reset form
-      setFormData({
-        name: '',
-        email: '',
-        password: '',
-        phone: '',
-        age: '',
-        blood_type: '',
-        district: '',
-        city: '',
-        last_donation_date: '',
-      });
-      setProfilePicture(null);
-
-    } catch (err) {
-      console.error('Registration error:', err);
-      setError(`Registration failed: ${err?.message || String(err) || 'Unknown error'}`);
-    } finally {
+  try {
+    // Validate form
+    if (!validateForm()) {
       setLoading(false);
+      return;
     }
-  };
+
+    let profilePictureUrl = null;
+
+    // Upload profile picture if selected
+    if (profilePicture) {
+      try {
+        const fileExt = (profilePicture.name || '').split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt || 'jpg'}`;
+        
+        const uploadResult = await supabase.storage
+          .from('profile-pictures')
+          .upload(fileName, profilePicture);
+
+        const uploadError = uploadResult?.error ?? (uploadResult?.data?.error ?? null);
+        if (uploadError) throw uploadError;
+
+        const publicUrlResult = await supabase.storage
+          .from('profile-pictures')
+          .getPublicUrl(fileName);
+
+        profilePictureUrl = publicUrlResult?.data?.publicUrl ?? publicUrlResult?.publicUrl ?? null;
+      } catch (uploadError) {
+        console.warn('Profile picture upload failed:', uploadError);
+        // Continue without profile picture
+      }
+    }
+
+    // Prepare donor data
+    const donorData = {
+      name: (formData.name || '').trim(),
+      email: (formData.email || '').trim(),
+      phone: (formData.phone || '').trim(),
+      age: parseInt(formData.age, 10),
+      blood_type: formData.blood_type || null,
+      district: formData.district || null,
+      city: (formData.city || '').trim(),
+      last_donation_date: formData.last_donation_date || null,
+      profile_picture: profilePictureUrl,
+      created_at: new Date().toISOString(),
+    };
+
+    console.log('Starting registration process...');
+
+    // Create user account and donor profile
+    const signupResult = await signUp(formData.email, formData.password, donorData);
+    
+    // ✅ FIXED: Check for errors properly
+    if (signupResult && signupResult.error) {
+      throw new Error(signupResult.error);
+    }
+
+    if (!signupResult || !signupResult.success) {
+      throw new Error('Registration failed without specific error');
+    }
+
+    console.log('✅ Registration successful!', signupResult);
+
+    // ✅ Set flag for new registration
+    sessionStorage.setItem('newDonorRegistered', 'true');
+    
+    // ✅ Also set in localStorage for cross-tab communication
+    localStorage.setItem('lastRegisteredDonor', JSON.stringify({
+      name: formData.name,
+      time: new Date().toISOString()
+    }));
+
+    setSuccess('Registration successful! You are now logged in.');
+
+    // Reset form
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      phone: '',
+      age: '',
+      blood_type: '',
+      district: '',
+      city: '',
+      last_donation_date: '',
+    });
+    setProfilePicture(null);
+
+    // Auto-redirect to donors page after 3 seconds
+    setTimeout(() => {
+      window.location.href = '/donors';
+    }, 3000);
+
+  } catch (err) {
+    console.error('Registration error:', err);
+    setError(`Registration failed: ${err?.message || String(err) || 'Unknown error'}`);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="p-6">
@@ -208,8 +231,25 @@ const Register = () => {
       {/* Success Message */}
       {success && (
         <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-green-800 font-medium">Success!</p>
-          <p className="text-green-600 text-sm">{success}</p>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+              <User className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-green-800 font-medium">{success}</p>
+              <p className="text-green-600 text-sm mt-1">
+                You will be redirected to the donors page shortly...
+              </p>
+              <div className="mt-2">
+                <a 
+                  href="/donors" 
+                  className="inline-flex items-center gap-1 text-green-700 hover:text-green-800 font-medium text-sm"
+                >
+                  Go to Find Donors Now →
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
