@@ -1,3 +1,4 @@
+// src/components/admin/AdminSidebar.jsx
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
@@ -22,17 +23,14 @@ const AdminSidebar = () => {
     { path: '/admin/requests', icon: Droplets, label: 'Blood Requests' },
     { path: '/admin/messages', icon: MessageSquare, label: 'Messages' },
     { path: '/admin/reports', icon: BarChart3, label: 'Analytics' },
-    { path: '/admin/content', icon: FileText, label: 'Content' },
-    { path: '/admin/users', icon: UserCog, label: 'Admin Users' },
     { path: '/admin/settings', icon: Settings, label: 'Settings' },
   ];
 
   return (
     <div 
-      className={`bg-gray-900 text-white h-[calc(100vh-73px)] transition-all duration-300 ${
+      className={`bg-gray-900 text-white h-[calc(100vh-64px)] fixed top-16 left-0 transition-all duration-300 ${
         collapsed ? 'w-20' : 'w-64'
       }`}
-      style={{ width: collapsed ? '80px' : '256px' }}
     >
       <div className="p-6 border-b border-gray-800">
         <div className="flex items-center gap-3">
@@ -71,7 +69,7 @@ const AdminSidebar = () => {
         })}
       </nav>
 
-      <div className="p-4 border-t border-gray-800 mt-auto">
+      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-800">
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"

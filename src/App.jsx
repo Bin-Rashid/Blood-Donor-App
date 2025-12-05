@@ -11,9 +11,9 @@ import Footer from './components/Footer';
 import Register from './pages/Register';
 import Donors from './pages/Donors';
 import ResetPassword from './pages/ResetPassword';
-import AdminLoginModal from './components/AdminLoginModal'; // Add this import
-import AdminLayout from './components/admin/AdminLayout'; // Add this import
-import AdminDashboard from './pages/AdminDashboard'; // Add this import
+import AdminLoginModal from './components/AdminLoginModal';
+import AdminLayout from './components/admin/AdminLayout';
+import AdminDashboard from './pages/AdminDashboard';
 import GuidelinesPopup from './components/GuidelinesPopup';
 
 import { supabase } from './services/supabase';
@@ -30,6 +30,7 @@ const ProtectedAdminRoute = ({ children }) => {
   return children;
 };
 
+// Loading Spinner Component
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center min-h-screen">
     <div className="text-center">
@@ -39,14 +40,15 @@ const LoadingSpinner = () => (
   </div>
 );
 
-function AppContent() {
+// Frontend Layout Component (for regular pages)
+function FrontendLayout() {
   const [activeTab, setActiveTab] = useState('register');
   const [heroSettings, setHeroSettings] = useState({
     text: 'Connecting blood donors with those in need. Your single donation can save up to three lives.',
     whatsapp_number: '+880XXXXXXXXX',
     instructions_text: 'জীবন বাঁচাতে রক্তদান করুন',
   });
-  const [showAdminLoginModal, setShowAdminLoginModal] = useState(false); // Renamed
+  const [showAdminLoginModal, setShowAdminLoginModal] = useState(false);
   const [showGuidelinesPopup, setShowGuidelinesPopup] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -102,7 +104,6 @@ function AppContent() {
     if (!isAdmin) {
       setShowAdminLoginModal(true);
     } else {
-      // If already admin, you can directly open settings or show a toast
       alert('You are already logged in as admin. Navigate to admin panel for settings.');
     }
   };
@@ -152,17 +153,6 @@ function AppContent() {
             <Route path="/register" element={<Register />} />
             <Route path="/donors" element={<Donors />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            
-            {/* Admin Routes */}
-            <Route path="/admin" element={
-              <ProtectedAdminRoute>
-                <AdminLayout />
-              </ProtectedAdminRoute>
-            }>
-              <Route index element={<AdminDashboard />} />
-              {/* Add more admin routes as needed */}
-              <Route path="dashboard" element={<AdminDashboard />} />
-            </Route>
           </Routes>
         </main>
 
@@ -186,6 +176,7 @@ function AppContent() {
   );
 }
 
+// Main App Component
 function App() {
   return (
     <BrowserRouter
@@ -196,7 +187,17 @@ function App() {
     >
       <AuthProvider>
         <DonorProvider>
-          <AppContent />
+          <Routes>
+            {/* Frontend Routes */}
+            <Route path="/*" element={<FrontendLayout />} />
+            
+            {/* Admin Routes - Completely separate layout */}
+            <Route path="/admin/*" element={
+              <ProtectedAdminRoute>
+                <AdminLayout />
+              </ProtectedAdminRoute>
+            } />
+          </Routes>
         </DonorProvider>
       </AuthProvider>
     </BrowserRouter>
