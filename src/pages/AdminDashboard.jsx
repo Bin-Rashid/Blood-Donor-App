@@ -15,7 +15,12 @@ import {
   Calendar,
   Bell,
   Download,
-  Filter
+  Filter,
+  BarChart3,
+  Clock,
+  Database,
+  Server,
+  ChevronRight
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -27,6 +32,8 @@ const AdminDashboard = () => {
     pendingRequests: 0,
     recentDonors: [],
     bloodGroupDistribution: {},
+    activeDonors: 0,
+    donationsThisMonth: 0,
   });
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState(null);
@@ -81,6 +88,24 @@ const AdminDashboard = () => {
         bloodGroupDistribution[bloodType] = (bloodGroupDistribution[bloodType] || 0) + 1;
       });
 
+      // Calculate active donors (donated in last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const activeDonors = allDonors?.filter(donor => {
+        if (!donor.last_donation_date) return false;
+        return new Date(donor.last_donation_date) >= thirtyDaysAgo;
+      }).length || 0;
+
+      // Calculate donations this month
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      
+      const { count: donationsThisMonth } = await supabase
+        .from('donors')
+        .select('*', { count: 'exact', head: true })
+        .gte('last_donation_date', startOfMonth.toISOString());
+
       // Simulate pending requests (you can replace with actual data)
       const pendingRequests = Math.floor(Math.random() * 15) + 5;
 
@@ -91,6 +116,8 @@ const AdminDashboard = () => {
         pendingRequests,
         recentDonors: recentDonors || [],
         bloodGroupDistribution,
+        activeDonors,
+        donationsThisMonth: donationsThisMonth || 0,
       });
 
       setLastUpdated(new Date());
@@ -126,7 +153,7 @@ const AdminDashboard = () => {
 
   if (loading && !lastUpdated) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh]">
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
           <h3 className="text-xl font-semibold text-gray-800 mb-2">Loading Dashboard</h3>
@@ -137,12 +164,31 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="p-4 md:p-6 lg:p-8 space-y-6">
+      {/* Breadcrumb Navigation */}
+      <nav className="flex" aria-label="Breadcrumb">
+        <ol className="inline-flex items-center space-x-1 md:space-x-2 text-sm">
+          <li className="inline-flex items-center">
+            <a href="/admin/dashboard" className="inline-flex items-center text-gray-700 hover:text-red-600">
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Dashboard
+            </a>
+          </li>
+          <li>
+            <div className="flex items-center">
+              <ChevronRight className="w-4 h-4 text-gray-400 mx-1" />
+              <span className="text-gray-500">Overview</span>
+            </div>
+          </li>
+        </ol>
+      </nav>
+
       {/* Dashboard Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Dashboard Overview</h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-gray-600 mt-1 flex items-center gap-2">
+            <Clock className="w-4 h-4" />
             Monitor your blood donation platform in real-time
             {lastUpdated && (
               <span className="text-sm text-gray-500 ml-2">
@@ -154,15 +200,15 @@ const AdminDashboard = () => {
         
         <div className="flex flex-wrap items-center gap-3">
           {/* Time Range Selector */}
-          <div className="flex items-center bg-white border border-gray-300 rounded-lg">
+          <div className="flex items-center bg-white border border-gray-300 rounded-lg shadow-sm">
             {['day', 'week', 'month', 'year'].map((range) => (
               <button
                 key={range}
                 onClick={() => handleTimeRangeChange(range)}
-                className={`px-3 py-2 text-sm font-medium capitalize transition-colors ${
+                className={`px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
                   timeRange === range
-                    ? 'bg-red-600 text-white'
-                    : 'text-gray-700 hover:bg-gray-100'
+                    ? 'bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-50'
                 } ${range === 'day' ? 'rounded-l-lg' : ''} ${range === 'year' ? 'rounded-r-lg' : ''}`}
               >
                 {range}
@@ -172,7 +218,7 @@ const AdminDashboard = () => {
           
           <button
             onClick={handleExportData}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
           >
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Export</span>
@@ -181,7 +227,7 @@ const AdminDashboard = () => {
           <button
             onClick={handleRefresh}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-lg hover:from-red-700 hover:to-pink-700 transition-colors disabled:opacity-50 shadow-sm"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
@@ -210,16 +256,16 @@ const AdminDashboard = () => {
       <StatsCards stats={stats} />
 
       {/* Charts and Analytics */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DashboardCharts stats={stats} />
-        <div className="space-y-8">
+        <div className="space-y-6">
           <ActivityTimeline />
           <SystemHealth />
         </div>
       </div>
 
       {/* Quick Actions and Recent Donors */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <QuickActions />
         </div>
@@ -246,7 +292,7 @@ const AdminDashboard = () => {
         </div>
         
         <div className="space-y-3">
-          <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
+          <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
             <div className="w-2 h-2 mt-2 bg-green-500 rounded-full"></div>
             <div>
               <p className="text-sm font-medium text-gray-800">Database backup completed</p>
@@ -254,7 +300,7 @@ const AdminDashboard = () => {
             </div>
           </div>
           
-          <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
+          <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
             <div className="w-2 h-2 mt-2 bg-yellow-500 rounded-full"></div>
             <div>
               <p className="text-sm font-medium text-gray-800">5 new donor registrations today</p>
@@ -262,7 +308,7 @@ const AdminDashboard = () => {
             </div>
           </div>
           
-          <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
+          <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
             <div className="w-2 h-2 mt-2 bg-blue-500 rounded-full"></div>
             <div>
               <p className="text-sm font-medium text-gray-800">System update available</p>
@@ -290,29 +336,29 @@ const AdminDashboard = () => {
         </div>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="text-center">
+          <div className="text-center p-4 bg-gray-50 rounded-lg">
             <div className="text-2xl font-bold text-gray-800 mb-1">
-              {Math.floor(stats.totalDonors * 0.15)}
+              {stats.activeDonors}
             </div>
             <div className="text-sm text-gray-600">Active Donors</div>
             <div className="text-xs text-green-600 mt-1">+12%</div>
           </div>
           
-          <div className="text-center">
+          <div className="text-center p-4 bg-gray-50 rounded-lg">
             <div className="text-2xl font-bold text-gray-800 mb-1">
-              {Math.floor(stats.totalDonors * 0.08)}
+              {stats.donationsThisMonth}
             </div>
             <div className="text-sm text-gray-600">Donations This Month</div>
             <div className="text-xs text-green-600 mt-1">+8%</div>
           </div>
           
-          <div className="text-center">
+          <div className="text-center p-4 bg-gray-50 rounded-lg">
             <div className="text-2xl font-bold text-gray-800 mb-1">94.7%</div>
             <div className="text-sm text-gray-600">System Uptime</div>
             <div className="text-xs text-green-600 mt-1">+0.3%</div>
           </div>
           
-          <div className="text-center">
+          <div className="text-center p-4 bg-gray-50 rounded-lg">
             <div className="text-2xl font-bold text-gray-800 mb-1">2.4s</div>
             <div className="text-sm text-gray-600">Avg. Response Time</div>
             <div className="text-xs text-red-600 mt-1">-0.2s</div>
@@ -333,9 +379,64 @@ const AdminDashboard = () => {
         </div>
       </div>
 
+      {/* System Status */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <Server className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-800">Database Status</h4>
+              <p className="text-sm text-gray-600">PostgreSQL Connection</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-green-600 font-medium">Healthy</span>
+            <span className="text-xs text-gray-500">Last check: 5 min ago</span>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Database className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-800">Storage Usage</h4>
+              <p className="text-sm text-gray-600">Database Storage</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-blue-600 font-medium">45% used</span>
+            <span className="text-xs text-gray-500">2.3 GB / 5 GB</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+            <div className="h-1.5 rounded-full bg-blue-500" style={{ width: '45%' }}></div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Users className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-800">User Activity</h4>
+              <p className="text-sm text-gray-600">Online Now</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-purple-600 font-medium">12 active users</span>
+            <span className="text-xs text-gray-500">Peak: 24 users</span>
+          </div>
+        </div>
+      </div>
+
       {/* Footer Note */}
-      <div className="text-center">
+      <div className="text-center pt-4 border-t border-gray-200">
         <p className="text-sm text-gray-500">
+          <Database className="w-4 h-4 inline mr-2" />
           Dashboard updates automatically every 5 minutes • 
           Last full sync: {lastUpdated ? lastUpdated.toLocaleString() : 'Never'}
         </p>

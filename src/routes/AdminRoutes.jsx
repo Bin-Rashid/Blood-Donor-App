@@ -2,9 +2,9 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import AdminDashboard from '../pages/AdminDashboard';
+import DonorManagement from '../pages/admin/DonorManagement'; // Make sure this path is correct
 
 // Create other admin pages as needed
-const AdminDonors = () => <div>Admin Donors Management</div>;
 const AdminRequests = () => <div>Blood Requests Management</div>;
 const AdminMessages = () => <div>Messages Management</div>;
 const AdminAnalytics = () => <div>Analytics Dashboard</div>;
@@ -18,7 +18,7 @@ const AdminRoutes = () => {
     <Routes>
       <Route path="/" element={<AdminDashboard />} />
       <Route path="/dashboard" element={<AdminDashboard />} />
-      <Route path="/donors" element={<AdminDonors />} />
+      <Route path="/donors" element={<DonorManagement />} />
       <Route path="/requests" element={<AdminRequests />} />
       <Route path="/messages" element={<AdminMessages />} />
       <Route path="/reports" element={<AdminAnalytics />} />

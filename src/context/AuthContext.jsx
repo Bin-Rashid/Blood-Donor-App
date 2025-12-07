@@ -45,6 +45,7 @@ const AuthContext = createContext({
   adminUser: null,
   signUp: async () => ({}),
   signIn: async () => ({}),
+  forgotPassword: async () => ({}), // Added this line
   signOut: async () => ({}),
   adminSignOut: async () => ({}),
   fullSignOut: async () => ({}),
@@ -234,6 +235,27 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // Forgot Password function - ADDED THIS FUNCTION
+  const forgotPassword = useCallback(async (email) => {
+    try {
+      if (!supabase || !supabase.auth) {
+        throw new Error('Auth client not available');
+      }
+      
+      const result = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (result?.error) {
+        return { error: result.error };
+      }
+      
+      return { success: true, error: null };
+    } catch (err) {
+      return { error: err };
+    }
+  }, []);
+
   // Regular user sign out
   const signOut = useCallback(async () => {
     try {
@@ -386,6 +408,7 @@ export const AuthProvider = ({ children }) => {
         adminUser,
         signUp, 
         signIn, 
+        forgotPassword, // Added this line
         signOut,
         adminSignOut,
         fullSignOut,

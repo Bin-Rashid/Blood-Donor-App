@@ -69,7 +69,7 @@ const Header = ({ heroText, onEditHero, donorsCount = 0 }) => {
   }
 
   return (
-    <div className="primary-gradient text-white relative overflow-hidden">
+    <div className="primary-gradient text-white relative">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute inset-0" style={{
