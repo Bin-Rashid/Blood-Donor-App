@@ -5,7 +5,6 @@ import AdminDashboard from '../pages/AdminDashboard';
 import DonorManagement from '../pages/admin/DonorManagement'; // Make sure this path is correct
 
 // Create other admin pages as needed
-const AdminRequests = () => <div>Blood Requests Management</div>;
 const AdminMessages = () => <div>Messages Management</div>;
 const AdminAnalytics = () => <div>Analytics Dashboard</div>;
 const AdminContent = () => <div>Content Management</div>;

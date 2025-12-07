@@ -19,12 +19,17 @@ import {
   Calendar,
   Filter,
   ChevronRight,
-  Phone
+  Phone,
+  TrendingUp,
+  TrendingDown,
+  Clock,
+  MapPin,
+  Droplets,
+  Bell
 } from 'lucide-react';
 
 const DonorManagement = () => {
   const [donors, setDonors] = useState([]);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
@@ -38,11 +43,6 @@ const DonorManagement = () => {
     gender: ''
   });
   const [selectedDonors, setSelectedDonors] = useState([]);
-
-const handleAddSuccess = () => {
-  fetchDonors();
-};
-
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -57,8 +57,124 @@ const handleAddSuccess = () => {
     total: 0,
     eligible: 0,
     recent: 0,
-    activeToday: 0
+    activeToday: 0,
+    growth: {
+      week: 0,
+      month: 0,
+      today: 0
+    }
   });
+  
+  // Dynamic data
+  const [districts, setDistricts] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [systemSettings, setSystemSettings] = useState({});
+  const [bloodTypes, setBloodTypes] = useState(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']);
+
+  // Fetch districts from database
+  const fetchDistricts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('districts')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      
+      setDistricts(data || []);
+    } catch (error) {
+      console.error('Error fetching districts:', error);
+      // Fallback to hardcoded districts if database fails
+      setDistricts([
+        'Dhaka', 'Chattogram', 'Khulna', 'Rajshahi', 'Barishal', 
+        'Sylhet', 'Rangpur', 'Mymensingh', 'Comilla', 'Noakhali'
+      ]);
+    }
+  };
+
+  // Fetch notifications from database
+  const fetchNotifications = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      if (error) throw error;
+      
+      setNotifications(data || []);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
+
+  // Fetch system settings from database
+  const fetchSystemSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('*');
+      
+      if (error) throw error;
+      
+      const settings = {};
+      data?.forEach(setting => {
+        settings[setting.key] = setting.value;
+      });
+      
+      setSystemSettings(settings);
+      
+      // Update blood types from settings if available
+      if (settings.blood_types) {
+        setBloodTypes(settings.blood_types);
+      }
+    } catch (error) {
+      console.error('Error fetching system settings:', error);
+    }
+  };
+
+  // Calculate growth percentages
+  const calculateGrowth = async () => {
+    const today = new Date();
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(today.getDate() - 7);
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(today.getMonth() - 1);
+    
+    try {
+      // Count donors from different time periods
+      const { count: totalToday } = await supabase
+        .from('donors')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', new Date(today.setHours(0, 0, 0, 0)).toISOString());
+      
+      const { count: totalWeek } = await supabase
+        .from('donors')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', oneWeekAgo.toISOString());
+      
+      const { count: totalMonth } = await supabase
+        .from('donors')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', oneMonthAgo.toISOString());
+      
+      // Calculate growth percentages
+      const growthWeek = totalWeek > 0 ? ((totalToday || 0) / totalWeek * 100 - 100).toFixed(1) : 0;
+      const growthMonth = totalMonth > 0 ? ((totalMonth || 0) / 30) : 0; // Average per day
+      
+      setStats(prev => ({
+        ...prev,
+        growth: {
+          week: parseFloat(growthWeek),
+          month: parseFloat(growthMonth),
+          today: totalToday || 0
+        }
+      }));
+    } catch (error) {
+      console.error('Error calculating growth:', error);
+    }
+  };
 
   const fetchDonors = async () => {
     try {
@@ -134,8 +250,6 @@ const handleAddSuccess = () => {
       
       // Apply age filter
       if (filters.ageMin || filters.ageMax) {
-        // Assuming you have an 'age' field in your donors table
-        // If not, you might need to calculate age from birth_date
         if (filters.ageMin) {
           query = query.gte('age', filters.ageMin);
         }
@@ -173,10 +287,12 @@ const handleAddSuccess = () => {
     }
   };
 
-  const calculateStats = (donorData) => {
+  const calculateStats = async (donorData) => {
     const today = new Date().toDateString();
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     
     const total = donorData.length;
     const eligible = donorData.filter(d => {
@@ -186,8 +302,6 @@ const handleAddSuccess = () => {
     
     const recent = donorData.filter(d => {
       const donorDate = new Date(d.created_at);
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
       return donorDate >= oneWeekAgo;
     }).length;
     
@@ -196,16 +310,41 @@ const handleAddSuccess = () => {
       return donorDate === today;
     }).length;
     
-    setStats({ total, eligible, recent, activeToday });
+    // Calculate blood type distribution
+    const bloodTypeDistribution = {};
+    donorData.forEach(d => {
+      const bloodType = d.blood_type || 'Unknown';
+      bloodTypeDistribution[bloodType] = (bloodTypeDistribution[bloodType] || 0) + 1;
+    });
+    
+    setStats(prev => ({ 
+      ...prev, 
+      total, 
+      eligible, 
+      recent, 
+      activeToday,
+      bloodTypeDistribution 
+    }));
+    
+    // Calculate growth percentages
+    await calculateGrowth();
   };
 
   useEffect(() => {
     fetchDonors();
+    fetchDistricts();
+    fetchNotifications();
+    fetchSystemSettings();
   }, [pagination.page, filters]);
+
+  // Auto-refresh notifications every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
-    // Debounce search
     const timer = setTimeout(() => {
       fetchDonors();
     }, 500);
@@ -262,9 +401,17 @@ const handleAddSuccess = () => {
           
         if (error) throw error;
         
+        // Create notification for deletion
+        await supabase.from('notifications').insert([{
+          type: 'bulk_delete',
+          message: `${selectedDonors.length} donors deleted by admin`,
+          is_read: false
+        }]);
+        
         alert('Donors deleted successfully');
         setSelectedDonors([]);
         fetchDonors();
+        fetchNotifications(); // Refresh notifications
       } catch (error) {
         console.error('Error deleting donors:', error);
         alert('Failed to delete donors');
@@ -279,13 +426,11 @@ const handleAddSuccess = () => {
     }
     
     // In a real app, you would navigate to a messaging page
-    // or open a messaging modal
     alert(`Messaging ${selectedDonors.length} donors...`);
   };
 
   const handleBulkExport = () => {
     if (!selectedDonors.length) {
-      // Export all if none selected
       alert('No donors selected. All donors will be exported.');
     }
     setShowExportModal(true);
@@ -297,8 +442,6 @@ const handleAddSuccess = () => {
   };
 
   const handleEditDonor = (donor) => {
-    // Navigate to edit page or show edit modal
-    // For now, we'll just view the profile
     setSelectedDonor(donor);
     setShowProfileModal(true);
   };
@@ -313,8 +456,16 @@ const handleAddSuccess = () => {
           
         if (error) throw error;
         
+        // Create notification
+        await supabase.from('notifications').insert([{
+          type: 'donor_deleted',
+          message: `Donor ${donor.name || donor.id} deleted by admin`,
+          is_read: false
+        }]);
+        
         alert('Donor deleted successfully');
         fetchDonors();
+        fetchNotifications();
       } catch (error) {
         console.error('Error deleting donor:', error);
         alert('Failed to delete donor');
@@ -323,8 +474,6 @@ const handleAddSuccess = () => {
   };
 
   const handleMessageDonor = (donor) => {
-    // In a real app, you would open a messaging modal
-    // or navigate to messages page
     alert(`Messaging ${donor.name || 'donor'}...`);
   };
 
@@ -351,6 +500,7 @@ const handleAddSuccess = () => {
 
   const handleRefresh = () => {
     fetchDonors();
+    fetchNotifications();
   };
 
   const handleImportComplete = () => {
@@ -362,14 +512,36 @@ const handleAddSuccess = () => {
     fetchDonors();
   };
 
+  // Mark notification as read
+  const handleMarkNotificationRead = async (notificationId) => {
+    try {
+      await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+      
+      fetchNotifications();
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
   // Breadcrumb navigation
   const breadcrumbs = [
     { label: 'Admin', href: '/admin/dashboard' },
     { label: 'Donor Management', href: '/admin/donors', current: true }
   ];
 
+  // Dynamic quick tips from system settings or default
+  const quickTips = systemSettings.quick_tips || [
+    { id: 1, tip: 'Click on column headers to sort donors' },
+    { id: 2, tip: 'Select multiple donors for bulk actions' },
+    { id: 3, tip: 'Use advanced filters to find specific donors' },
+    { id: 4, tip: 'Export data in CSV, Excel, or JSON format' }
+  ];
+
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-6">
+    <div className="space-y-6">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -405,7 +577,7 @@ const handleAddSuccess = () => {
             </span>
           </div>
           <p className="text-gray-600 mt-1">
-            Manage and organize your donor database with advanced filtering and bulk actions
+            {systemSettings.donor_management_description || 'Manage and organize your donor database with advanced filtering and bulk actions'}
           </p>
         </div>
         
@@ -462,63 +634,196 @@ const handleAddSuccess = () => {
         </div>
       )}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-5 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm opacity-90">Total Donors</p>
-              <p className="text-3xl font-bold mt-1">{stats.total}</p>
-            </div>
-            <Users className="w-10 h-10 opacity-90" />
+      {/* Modern Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Card 1: Total Donors */}
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-2xl hover:scale-[1.02] transition-all duration-500">
+          {/* Smooth Red Border */}
+          <div className="absolute inset-0 rounded-2xl p-[2px] bg-gradient-to-r from-red-500/0 via-red-500/50 to-pink-500/0 opacity-50 group-hover:opacity-100 transition-all duration-500">
+            <div className="absolute inset-[2px] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl"></div>
           </div>
-          <div className="mt-3 text-sm opacity-90">
-            <span className="flex items-center gap-1">
-              <Calendar className="w-4 h-4" />
-              All time
-            </span>
+          
+          <div className="relative p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">Total Donors</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2 bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent">
+                  {stats.total}
+                </p>
+              </div>
+              <div className="p-3 bg-gradient-to-br from-red-500 to-pink-500 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Users className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-gradient-to-r from-red-500 to-pink-500 rounded-full animate-pulse"></div>
+                <span className="text-sm text-gray-500">All time</span>
+              </div>
+              <div className={`text-xs font-medium px-3 py-1 rounded-full border flex items-center gap-1 ${
+                stats.growth.week > 0 
+                  ? 'bg-green-50 text-green-600 border-green-200' 
+                  : 'bg-red-50 text-red-600 border-red-200'
+              }`}>
+                {stats.growth.week > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                {Math.abs(stats.growth.week)}%
+              </div>
+            </div>
           </div>
         </div>
-        
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm opacity-90">Eligible Now</p>
-              <p className="text-3xl font-bold mt-1">{stats.eligible}</p>
-            </div>
-            <Users className="w-10 h-10 opacity-90" />
+
+        {/* Card 2: Eligible Now */}
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-2xl hover:scale-[1.02] transition-all duration-500">
+          {/* Smooth Green Border */}
+          <div className="absolute inset-0 rounded-2xl p-[2px] bg-gradient-to-r from-green-500/0 via-green-500/50 to-emerald-500/0 opacity-50 group-hover:opacity-100 transition-all duration-500">
+            <div className="absolute inset-[2px] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl"></div>
           </div>
-          <div className="mt-3 text-sm opacity-90">
-            Can donate now
+          
+          <div className="relative p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">Eligible Now</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                  {stats.eligible}
+                </p>
+              </div>
+              <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Users className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"></div>
+                <span className="text-sm text-gray-500">Ready to donate</span>
+              </div>
+              <div className="text-xs font-medium px-3 py-1 bg-gradient-to-r from-green-50 to-emerald-50 text-green-600 rounded-full border border-green-200">
+                Active
+              </div>
+            </div>
           </div>
         </div>
-        
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm opacity-90">Recent (7 days)</p>
-              <p className="text-3xl font-bold mt-1">{stats.recent}</p>
-            </div>
-            <RefreshCw className="w-10 h-10 opacity-90" />
+
+        {/* Card 3: Recent (7 days) */}
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-2xl hover:scale-[1.02] transition-all duration-500">
+          {/* Smooth Blue Border */}
+          <div className="absolute inset-0 rounded-2xl p-[2px] bg-gradient-to-r from-blue-500/0 via-blue-500/50 to-cyan-500/0 opacity-50 group-hover:opacity-100 transition-all duration-500">
+            <div className="absolute inset-[2px] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl"></div>
           </div>
-          <div className="mt-3 text-sm opacity-90">
-            New registrations
+          
+          <div className="relative p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">Recent</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2 bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                  {stats.recent}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Last 7 days</p>
+              </div>
+              <div className="p-3 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl shadow-lg relative group-hover:scale-110 transition-transform duration-300">
+                <RefreshCw className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full animate-pulse"></div>
+                <span className="text-sm text-gray-500">New registrations</span>
+              </div>
+              <div className="text-xs font-medium px-3 py-1 bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-600 rounded-full border border-blue-200">
+                +{stats.growth.today} today
+              </div>
+            </div>
           </div>
         </div>
-        
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm opacity-90">Active Today</p>
-              <p className="text-3xl font-bold mt-1">{stats.activeToday}</p>
-            </div>
-            <Users className="w-10 h-10 opacity-90" />
+
+        {/* Card 4: Active Today */}
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-2xl hover:scale-[1.02] transition-all duration-500">
+          {/* Smooth Purple Border */}
+          <div className="absolute inset-0 rounded-2xl p-[2px] bg-gradient-to-r from-purple-500/0 via-purple-500/50 to-violet-500/0 opacity-50 group-hover:opacity-100 transition-all duration-500">
+            <div className="absolute inset-[2px] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl"></div>
           </div>
-          <div className="mt-3 text-sm opacity-90">
-            Registered today
+          
+          <div className="relative p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">Active Today</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2 bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
+                  {stats.activeToday}
+                </p>
+              </div>
+              <div className="p-3 bg-gradient-to-br from-purple-500 to-violet-500 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Users className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-violet-500 rounded-full"></div>
+                <span className="text-sm text-gray-500">Registered today</span>
+              </div>
+              <div className="text-xs font-medium px-3 py-1 bg-gradient-to-r from-purple-50 to-violet-50 text-purple-600 rounded-full border border-purple-200">
+                Live
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Notifications Bar */}
+      {notifications.length > 0 && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <Bell className="w-5 h-5 text-blue-600" />
+              <h3 className="font-semibold text-gray-900">Recent Notifications</h3>
+              <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                {notifications.filter(n => !n.is_read).length} New
+              </span>
+            </div>
+            <button
+              onClick={fetchNotifications}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              Refresh
+            </button>
+          </div>
+          
+          <div className="space-y-2">
+            {notifications.slice(0, 3).map((notification) => (
+              <div
+                key={notification.id}
+                className={`flex items-start gap-3 p-3 rounded-lg ${notification.is_read ? 'bg-white' : 'bg-blue-50'} border border-blue-100`}
+              >
+                <div className={`w-2 h-2 mt-2 rounded-full ${notification.is_read ? 'bg-blue-300' : 'bg-blue-500 animate-pulse'}`}></div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-800">{notification.message}</p>
+                  <p className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                    <Clock className="w-3 h-3" />
+                    {new Date(notification.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+                {!notification.is_read && (
+                  <button
+                    onClick={() => handleMarkNotificationRead(notification.id)}
+                    className="text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    Mark read
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          
+          <button
+            onClick={() => window.location.href = '/admin/notifications'}
+            className="w-full mt-3 text-center text-blue-600 hover:text-blue-800 font-medium text-sm"
+          >
+            View All Notifications →
+          </button>
+        </div>
+      )}
 
       {/* Search and Bulk Actions Bar */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
@@ -527,7 +832,7 @@ const handleAddSuccess = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search donors by name, phone, email, or location..."
+              placeholder={systemSettings.search_placeholder || "Search donors by name, phone, email, or location..."}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
               value={searchTerm}
               onChange={handleSearch}
@@ -562,11 +867,13 @@ const handleAddSuccess = () => {
         </div>
       </div>
 
-      {/* Filters Section */}
+      {/* Filters - Pass dynamic districts and blood types */}
       <DonorFilters 
         filters={filters}
         onFilterChange={handleFilterChange}
         onClearFilters={handleClearFilters}
+        districts={districts}
+        bloodTypes={bloodTypes}
       />
 
       {/* Donor Table */}
@@ -611,43 +918,27 @@ const handleAddSuccess = () => {
         />
       </div>
 
-      {/* Quick Tips */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
-        <div className="flex items-start gap-4">
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <Filter className="w-6 h-6 text-blue-600" />
-          </div>
-          <div>
-            <h4 className="font-semibold text-gray-900 mb-2">Quick Tips</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="flex items-start gap-2">
-                <div className="w-2 h-2 mt-2 bg-blue-500 rounded-full"></div>
-                <p className="text-sm text-gray-700">
-                  <span className="font-medium">Click on column headers</span> to sort donors
-                </p>
-              </div>
-              <div className="flex items-start gap-2">
-                <div className="w-2 h-2 mt-2 bg-blue-500 rounded-full"></div>
-                <p className="text-sm text-gray-700">
-                  <span className="font-medium">Select multiple donors</span> for bulk actions
-                </p>
-              </div>
-              <div className="flex items-start gap-2">
-                <div className="w-2 h-2 mt-2 bg-blue-500 rounded-full"></div>
-                <p className="text-sm text-gray-700">
-                  <span className="font-medium">Use advanced filters</span> to find specific donors
-                </p>
-              </div>
-              <div className="flex items-start gap-2">
-                <div className="w-2 h-2 mt-2 bg-blue-500 rounded-full"></div>
-                <p className="text-sm text-gray-700">
-                  <span className="font-medium">Export data</span> in CSV, Excel, or JSON format
-                </p>
+      {/* Dynamic Quick Tips */}
+      {quickTips.length > 0 && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
+          <div className="flex items-start gap-4">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Filter className="w-6 h-6 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-gray-900 mb-3">Quick Tips</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {quickTips.slice(0, 4).map((tip, index) => (
+                  <div key={tip.id || index} className="flex items-start gap-2">
+                    <div className="w-2 h-2 mt-2 bg-blue-500 rounded-full"></div>
+                    <p className="text-sm text-gray-700">{tip.tip}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Modals */}
       {showExportModal && (
@@ -657,14 +948,6 @@ const handleAddSuccess = () => {
           selectedDonors={selectedDonors}
         />
       )}
-
-      {showAddModal && (
-  <AddDonorModal
-    isOpen={showAddModal}
-    onClose={() => setShowAddModal(false)}
-    onSuccess={handleAddSuccess}
-  />
-)}
 
       {showImportModal && (
         <ExportImportModal
@@ -692,7 +975,7 @@ const handleAddSuccess = () => {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => window.open('/admin/help/donor-management', '_blank')}
+            onClick={() => window.open(systemSettings.help_url || '/admin/help/donor-management', '_blank')}
             className="text-sm text-blue-600 hover:text-blue-800"
           >
             Need Help?
