@@ -554,7 +554,9 @@ const Donors = () => {
             <RefreshCw className="w-4 h-4" />
             Refresh Data
           </button>
-          <button
+          
+          {isAdmin && (
+            <button
             onClick={exportData}
             className="btn-outline py-2 flex items-center gap-2"
             disabled={donors.length === 0}
@@ -562,7 +564,9 @@ const Donors = () => {
             <Download className="w-4 h-4" />
             Export Data ({donors.length})
           </button>
+)}
           {isAdmin && (
+            
             <button
               onClick={clearVisiblePhones}
               className="btn-outline py-2 flex items-center gap-2 bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100"
