@@ -555,6 +555,7 @@ const Donors = () => {
             Refresh Data
           </button>
           
+          {/* export button only for admin */}
           {isAdmin && (
             <button
             onClick={exportData}
@@ -564,7 +565,8 @@ const Donors = () => {
             <Download className="w-4 h-4" />
             Export Data ({donors.length})
           </button>
-)}
+        )}
+        {/* Hide All Phones button only for admin */}
           {isAdmin && (
             
             <button
